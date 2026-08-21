@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { SignupForm } from './signup-form';
 import { ValoriaLogo } from '@/components/brand/logo';
 
+export const dynamic = 'force-dynamic';
+
 export default function SignupPage() {
   return (
     <div className="min-h-screen grid md:grid-cols-2">

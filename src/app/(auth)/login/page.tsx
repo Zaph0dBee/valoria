@@ -3,6 +3,8 @@ import { LoginForm } from './login-form';
 import Link from 'next/link';
 import { ValoriaLogo } from '@/components/brand/logo';
 
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   return (
     <div className="min-h-screen grid md:grid-cols-2">
