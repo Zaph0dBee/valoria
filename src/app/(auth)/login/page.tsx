@@ -1,6 +1,7 @@
+import { Suspense } from 'react';
 import { LoginForm } from './login-form';
 import Link from 'next/link';
-import { ValoriaLogo, ValoriaMark } from '@/components/brand/logo';
+import { ValoriaLogo } from '@/components/brand/logo';
 
 export default function LoginPage() {
   return (
@@ -31,7 +32,9 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground mb-8">
             Seus lançamentos, categorias e metas estão esperando.
           </p>
-          <LoginForm />
+          <Suspense fallback={<div className="h-64" />}>
+            <LoginForm />
+          </Suspense>
           <p className="mt-8 text-sm text-muted-foreground">
             Ainda não tem conta?{' '}
             <Link href="/signup" className="text-primary font-medium underline-offset-4 hover:underline">
