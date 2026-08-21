@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,6 @@ import { useToast } from '@/components/ui/toaster';
 export function LoginForm() {
   const [loading, setLoading] = React.useState(false);
   const router = useRouter();
-  const params = useSearchParams();
   const { toast } = useToast();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -36,6 +35,8 @@ export function LoginForm() {
       return;
     }
 
+    // Pega o ?next=... direto do URL — sem useSearchParams
+    const params = new URLSearchParams(window.location.search);
     const next = params.get('next') || '/dashboard';
     router.push(next);
     router.refresh();
