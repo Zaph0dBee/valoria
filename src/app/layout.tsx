@@ -4,6 +4,8 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 const montserrat = Montserrat({
   subsets: ['latin'],
   variable: '--font-montserrat',

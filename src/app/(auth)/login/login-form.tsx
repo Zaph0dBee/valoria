@@ -35,7 +35,6 @@ export function LoginForm() {
       return;
     }
 
-    // Pega o ?next=... direto do URL — sem useSearchParams
     const params = new URLSearchParams(window.location.search);
     const next = params.get('next') || '/dashboard';
     router.push(next);
