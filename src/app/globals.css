@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Valoria — Design Tokens
+   Paleta oficial: Verde Floresta, Dourado Fosco, Marfin, Grafite, Verde Sálvia
+   Voz: verdadeiro, firme, acolhedor, estratégico
+   ============================================================================ */
+
+@layer base {
+  :root {
+    /* Superfícies — marfin */
+    --background: 36 45% 90%;          /* #F0E7D8 marfin */
+    --foreground: 156 55% 8%;          /* #0A2E20 verde floresta */
+    --paper: 36 40% 87%;               /* marfin um tom mais quente */
+
+    --card: 36 50% 94%;
+    --card-foreground: 156 55% 8%;
+
+    --popover: 36 50% 94%;
+    --popover-foreground: 156 55% 8%;
+
+    /* Primária — verde floresta */
+    --primary: 156 55% 8%;             /* #0A2E20 */
+    --primary-foreground: 36 45% 90%;
+
+    /* Accent — dourado fosco */
+    --accent: 35 42% 53%;              /* #B99154 */
+    --accent-foreground: 156 55% 8%;
+
+    --secondary: 88 15% 76%;           /* verde sálvia clarinho */
+    --secondary-foreground: 156 55% 8%;
+
+    --muted: 36 30% 82%;
+    --muted-foreground: 156 20% 30%;
+
+    /* Sinais financeiros — combinam com a paleta terrosa */
+    --destructive: 10 55% 38%;         /* vermelho tijolo escuro */
+    --destructive-foreground: 36 45% 90%;
+    --positive: 156 55% 20%;           /* verde mais claro que primary */
+    --positive-foreground: 36 45% 90%;
+    /* Dourado como cor de reserva */
+    --reserve: 35 42% 45%;
+    --reserve-foreground: 36 45% 90%;
+
+    --border: 36 25% 76%;
+    --input: 36 25% 76%;
+    --ring: 35 42% 53%;                /* focus ring dourado */
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Superfícies — grafite + verde escuro */
+    --background: 156 35% 6%;          /* verde mais profundo */
+    --foreground: 36 45% 90%;
+    --paper: 200 5% 12%;               /* #1D1F1E grafite */
+
+    --card: 200 5% 12%;
+    --card-foreground: 36 45% 90%;
+
+    --popover: 200 5% 12%;
+    --popover-foreground: 36 45% 90%;
+
+    /* Primária — dourado no dark (inverte) */
+    --primary: 35 42% 60%;             /* dourado mais claro no dark */
+    --primary-foreground: 156 55% 8%;
+
+    --accent: 35 42% 60%;
+    --accent-foreground: 156 55% 8%;
+
+    --secondary: 88 12% 30%;
+    --secondary-foreground: 36 45% 90%;
+
+    --muted: 156 20% 15%;
+    --muted-foreground: 36 20% 65%;
+
+    --destructive: 10 50% 55%;
+    --destructive-foreground: 36 45% 90%;
+    --positive: 88 20% 60%;            /* verde sálvia claro */
+    --positive-foreground: 156 55% 8%;
+    --reserve: 35 42% 60%;
+    --reserve-foreground: 156 55% 8%;
+
+    --border: 156 20% 18%;
+    --input: 156 20% 18%;
+    --ring: 35 42% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'kern', 'liga', 'ss01';
+  }
+
+  /* Números tabulares — impossível ler finanças sem isso */
+  .num, .num * {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Selection em verde floresta */
+  ::selection {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+}
+
+@layer components {
+  /* Regra fina de separação */
+  .rule {
+    @apply border-b border-border/60;
+  }
+
+  /* Eyebrow — em dourado, letra pequena */
+  .eyebrow {
+    @apply text-xs uppercase tracking-[0.16em] font-medium;
+    color: hsl(var(--accent));
+  }
+
+  /* Tratamento serif italico — voz da marca (Caladea) */
+  .voice {
+    font-family: var(--font-caladea), Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+  }
+}
+
+/* Respeito a reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
