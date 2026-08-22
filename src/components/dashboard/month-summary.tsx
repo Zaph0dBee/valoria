@@ -2,32 +2,44 @@ import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { OpeningBalanceEditor } from './opening-balance-editor';
 
 type Summary = {
-  total_receita: number | null;
-  total_despesa: number | null;
-  total_reserva: number | null;
-  resultado_liquido: number | null;
+  saldo_inicial: number;
+  total_receita: number;
+  total_despesa: number;
+  resultado_operacional: number;
+  total_aportes: number;
+  disponivel_antes_aportes: number;
+  saldo_final: number;
   transactions_count: number;
 };
 
 export function MonthSummary({
   summary,
-  prevResult,
+  prevOperationalResult,
+  year,
+  month,
+  openingIsManual,
 }: {
   summary: Summary;
-  prevResult: number | null;
+  prevOperationalResult: number | null;
+  year: number;
+  month: number;
+  openingIsManual: boolean;
 }) {
-  const result = Number(summary.resultado_liquido ?? 0);
+  const opening = Number(summary.saldo_inicial ?? 0);
   const receita = Number(summary.total_receita ?? 0);
   const despesa = Number(summary.total_despesa ?? 0);
-  const reserva = Number(summary.total_reserva ?? 0);
-  const positive = result >= 0;
+  const operational = Number(summary.resultado_operacional ?? 0);
+  const aportes = Number(summary.total_aportes ?? 0);
+  const finalBalance = Number(summary.saldo_final ?? 0);
+  const positive = finalBalance >= 0;
 
   let variation: { pct: number; direction: 'up' | 'down' | 'flat' } | null = null;
-  if (prevResult !== null && Number(prevResult) !== 0) {
-    const prev = Number(prevResult);
-    const pct = ((result - prev) / Math.abs(prev)) * 100;
+  if (prevOperationalResult !== null && Number(prevOperationalResult) !== 0) {
+    const prev = Number(prevOperationalResult);
+    const pct = ((operational - prev) / Math.abs(prev)) * 100;
     variation = {
       pct: Math.abs(pct),
       direction: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat',
@@ -36,43 +48,65 @@ export function MonthSummary({
 
   return (
     <Card className="p-8 bg-paper">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-        <div>
-          <p className="eyebrow mb-3">saldo do mês</p>
-          <div className="flex items-baseline gap-3">
+      <div className="space-y-7">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div>
+            <p className="eyebrow mb-3">saldo disponível</p>
             <span
               className={cn(
                 'font-display text-6xl md:text-7xl tracking-tight num',
                 positive ? 'text-positive' : 'text-destructive',
               )}
             >
-              {formatMoney(result)}
+              {formatMoney(finalBalance)}
             </span>
-          </div>
-          {variation && (
-            <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-              {variation.direction === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
-              {variation.direction === 'down' && <ArrowDownRight className="h-4 w-4 text-destructive" />}
-              {variation.direction === 'flat' && <Minus className="h-4 w-4" />}
-              <span className="num">{variation.pct.toFixed(1)}%</span>
-              <span>vs mês anterior</span>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Saldo inicial + receitas − despesas − aportes.
             </p>
-          )}
+            {variation && (
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+                {variation.direction === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
+                {variation.direction === 'down' && <ArrowDownRight className="h-4 w-4 text-destructive" />}
+                {variation.direction === 'flat' && <Minus className="h-4 w-4" />}
+                <span className="num">{variation.pct.toFixed(1)}%</span>
+                <span>no resultado operacional vs mês anterior</span>
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-7 gap-y-5 shrink-0">
+            <div>
+              <div className="flex items-center gap-1">
+                <p className="eyebrow">saldo inicial</p>
+                <OpeningBalanceEditor
+                  year={year}
+                  month={month}
+                  currentValue={opening}
+                  isManual={openingIsManual}
+                />
+              </div>
+              <p className="font-display text-2xl num tracking-tight">{formatMoney(opening)}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{openingIsManual ? 'definido por você' : 'carregado automaticamente'}</p>
+            </div>
+            <SummaryItem label="entradas" value={receita} tone="positive" />
+            <SummaryItem label="saídas" value={despesa} tone="destructive" />
+            <SummaryItem label="resultado" value={operational} tone={operational >= 0 ? 'positive' : 'destructive'} />
+            <SummaryItem label="aportes" value={aportes} tone="primary" />
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6 md:gap-8 shrink-0">
-          <SummaryItem label="entrou" value={receita} tone="positive" />
-          <SummaryItem label="saiu" value={despesa} tone="destructive" />
-          <SummaryItem label="reservou" value={reserva} tone="primary" />
-        </div>
+        {receita > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="eyebrow">uso das entradas</p>
+              <p className="text-xs text-muted-foreground num">
+                antes dos aportes: {formatMoney(Number(summary.disponivel_antes_aportes ?? 0))}
+              </p>
+            </div>
+            <StackedBar receita={receita} despesa={despesa} aportes={aportes} />
+          </div>
+        )}
       </div>
-
-      {receita > 0 && (
-        <div className="mt-8">
-          <p className="eyebrow mb-2">composição</p>
-          <StackedBar receita={receita} despesa={despesa} reserva={reserva} />
-        </div>
-      )}
     </Card>
   );
 }
@@ -104,40 +138,28 @@ function SummaryItem({
 function StackedBar({
   receita,
   despesa,
-  reserva,
+  aportes,
 }: {
   receita: number;
   despesa: number;
-  reserva: number;
+  aportes: number;
 }) {
-  const total = Math.max(receita, despesa + reserva, 1);
+  const total = Math.max(receita, despesa + aportes, 1);
   const despPct = (despesa / total) * 100;
-  const resPct = (reserva / total) * 100;
-  const restPct = Math.max(100 - despPct - resPct, 0);
+  const aportePct = (aportes / total) * 100;
+  const restPct = Math.max(100 - despPct - aportePct, 0);
 
   return (
     <div>
       <div className="h-2.5 w-full rounded-full overflow-hidden bg-muted flex">
-        <div
-          className="bg-destructive/85"
-          style={{ width: `${despPct}%` }}
-          title={`Despesas: ${despPct.toFixed(1)}%`}
-        />
-        <div
-          className="bg-primary/85"
-          style={{ width: `${resPct}%` }}
-          title={`Reservas: ${resPct.toFixed(1)}%`}
-        />
-        <div
-          className="bg-positive/60"
-          style={{ width: `${restPct}%` }}
-          title={`Sobrou: ${restPct.toFixed(1)}%`}
-        />
+        <div className="bg-destructive/85" style={{ width: `${despPct}%` }} title={`Despesas: ${despPct.toFixed(1)}%`} />
+        <div className="bg-primary/85" style={{ width: `${aportePct}%` }} title={`Aportes: ${aportePct.toFixed(1)}%`} />
+        <div className="bg-positive/60" style={{ width: `${restPct}%` }} title={`Livre: ${restPct.toFixed(1)}%`} />
       </div>
       <div className="flex flex-wrap gap-4 mt-3 text-xs text-muted-foreground">
         <LegendDot color="bg-destructive/85" label={`Despesas ${despPct.toFixed(0)}%`} />
-        <LegendDot color="bg-primary/85" label={`Reservas ${resPct.toFixed(0)}%`} />
-        <LegendDot color="bg-positive/60" label={`Sobrou ${restPct.toFixed(0)}%`} />
+        <LegendDot color="bg-primary/85" label={`Aportes ${aportePct.toFixed(0)}%`} />
+        <LegendDot color="bg-positive/60" label={`Livre ${restPct.toFixed(0)}%`} />
       </div>
     </div>
   );

@@ -50,7 +50,11 @@ function parseDate(raw: unknown): string | null {
   if (dash) return `${dash[3]}-${dash[2]}-${dash[1]}`;
   // Tenta Date parser como último recurso
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  if (isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function parseCSV(csvText: string): {

@@ -1,0 +1,24 @@
+HOTFIX - Edição de Categorias / Subcategorias
+
+Extraia o CONTEÚDO deste ZIP diretamente em:
+C:\Users\mkjk1\Documents\Projetos\norte\norte
+
+Substitua os arquivos existentes quando o Windows perguntar.
+
+Arquivos alterados:
+- src\actions\categories.ts
+- src\app\(app)\categorias\categories-client.tsx
+
+O hotfix adiciona:
+- editar categoria clicando no nome ou no ícone de lápis;
+- alterar nome e cor da categoria;
+- editar subcategoria clicando no nome ou no lápis;
+- arquivar subcategoria sem apagar lançamentos antigos;
+- botão + explícito para adicionar subcategoria;
+- mantém os tipos Receita / Despesa / Construção-Aportes fixos para preservar a consistência dos lançamentos.
+
+Depois de extrair:
+1) pare o npm run dev com Ctrl+C;
+2) rode npm run check;
+3) rode npm run dev;
+4) atualize o navegador com Ctrl+F5.

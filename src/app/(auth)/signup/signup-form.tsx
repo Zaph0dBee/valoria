@@ -81,7 +81,7 @@ export function SignupForm() {
           className="mt-1 h-4 w-4 rounded border-input accent-primary"
         />
         <span className="text-muted-foreground">
-          Começar com o template da planilha clássica (10 categorias, subcategorias comuns). Você pode editar tudo depois.
+          Começar com o template financeiro completo (receitas, construção, 10 grupos de despesas e subcategorias da planilha). Você pode editar tudo depois.
         </span>
       </label>
       <Button type="submit" className="w-full" disabled={loading}>

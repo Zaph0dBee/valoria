@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/toaster';
+import { safeRedirectPath } from '@/lib/navigation';
 
 export function LoginForm() {
   const [loading, setLoading] = React.useState(false);
@@ -36,7 +37,7 @@ export function LoginForm() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    const next = params.get('next') || '/dashboard';
+    const next = safeRedirectPath(params.get('next'));
     router.push(next);
     router.refresh();
   }

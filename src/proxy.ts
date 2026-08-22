@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
+import { updateSession } from '@/lib/supabase/proxy';
 
-export async function middleware(request: NextRequest) {
-  const { response, user } = await updateSession(request);
+export async function proxy(request: NextRequest) {
+  const { response, userId } = await updateSession(request);
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup');
@@ -13,16 +13,17 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/metas') ||
     pathname.startsWith('/importar');
 
-  if (!user && isProtectedRoute) {
+  if (!userId && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (userId && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
+    url.search = '';
     return NextResponse.redirect(url);
   }
 

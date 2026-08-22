@@ -1,11 +1,20 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database';
 
-export async function createClient() {
+type CookieToSet = {
+  name: string;
+  value: string;
+  options: CookieOptions;
+};
+
+export async function createClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(
+  // @supabase/ssr 0.5.x foi instalado com uma versão mais nova do supabase-js.
+  // O cast mantém a tipagem do banco correta sem alterar o comportamento em runtime.
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -13,17 +22,16 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
           } catch {
-            // Server component contexts don't allow set — safe to ignore,
-            // middleware handles session refresh.
+            // Server Components não podem escrever cookies. O proxy mantém a sessão atualizada.
           }
         },
       },
     },
-  );
+  ) as unknown as SupabaseClient<Database>;
 }

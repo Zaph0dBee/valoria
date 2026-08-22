@@ -13,10 +13,10 @@ export default async function MetasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="eyebrow mb-1">longo prazo</p>
-        <h1 className="font-display text-4xl tracking-tight">Metas & Reservas</h1>
+        <p className="eyebrow mb-1">construção</p>
+        <h1 className="font-display text-4xl tracking-tight">Metas & Patrimônio</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Reserva de emergência, viagem, entrada do imóvel — o que estiver puxando você pra frente.
+          Defina objetivos e registre aportes. Quando um aporte é vinculado a uma meta, o progresso é atualizado automaticamente.
         </p>
       </div>
 

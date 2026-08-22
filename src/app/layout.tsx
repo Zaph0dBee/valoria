@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="pt-BR"
       suppressHydrationWarning
-      className={`${montserrat.variable} ${cormorant.variable} ${caladea.variable}`}
+      className={`${montserrat.variable} ${cormorant.variable} ${caladea.variable} dark`}
     >
       <body className="min-h-screen font-sans">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>

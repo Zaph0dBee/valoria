@@ -113,7 +113,7 @@ export default async function LandingPage() {
             />
             <Feature
               title="Metas com propósito"
-              body="Reserva de emergência, viagem, casa. Cada meta com progresso, prazo e cor. Botões rápidos de aporte."
+              body="Reserva de emergência, viagem, casa. Cada meta com progresso, prazo e aportes vinculados aos lançamentos."
             />
           </div>
         </div>

@@ -6,7 +6,6 @@ import {
   GROUP_DESCRIPTIONS,
   calcSemaphore,
   SEMAPHORE_STYLES,
-  referenceMessage,
   type SemaphoreLevel,
 } from '@/lib/valoria-references';
 import type { CategoryGroup } from '@/types/database';
@@ -37,7 +36,6 @@ export function NCEDistribution({
     totals[key] += Number(i.total);
   }
 
-  const totalOut = Object.values(totals).reduce((s, v) => s + v, 0);
   const semNoIncome = totalIncome === 0;
 
   const groups: CategoryGroup[] = ['necessidades', 'construcao', 'estilo', 'livre'];

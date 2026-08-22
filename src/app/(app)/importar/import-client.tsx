@@ -23,6 +23,9 @@ import type { TransactionKind } from '@/types/database';
 
 type Cat = { id: string; name: string; kind: TransactionKind; color: string };
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 2000;
+
 export function ImportClient({ categories }: { categories: Cat[] }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -36,12 +39,23 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setRows([]);
+      setErrors(['O arquivo ultrapassa 5 MB. Divida-o em arquivos menores.']);
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
     setFilename(file.name);
     const text = await file.text();
     const isOFX = file.name.toLowerCase().endsWith('.ofx') || text.includes('<OFX>');
     const src = isOFX ? 'ofx' : 'csv';
     setSource(src);
     const parsed = isOFX ? parseOFX(text) : parseCSV(text);
+    if (parsed.rows.length > MAX_IMPORT_ROWS) {
+      setRows([]);
+      setErrors([`O arquivo contém ${parsed.rows.length} lançamentos. O limite por importação é ${MAX_IMPORT_ROWS}.`]);
+      return;
+    }
     setRows(parsed.rows);
     setErrors(parsed.errors);
 
@@ -169,7 +183,7 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
                         <SelectContent>
                           <SelectItem value="receita">Receita</SelectItem>
                           <SelectItem value="despesa">Despesa</SelectItem>
-                          <SelectItem value="reserva">Reserva</SelectItem>
+                          <SelectItem value="reserva">Aporte</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
