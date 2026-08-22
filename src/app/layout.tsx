@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${montserrat.variable} ${cormorant.variable} ${caladea.variable}`}
     >
       <body className="min-h-screen font-sans">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <Toaster>{children}</Toaster>
         </ThemeProvider>
       </body>

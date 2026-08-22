@@ -4,6 +4,7 @@ import { currentMonth, formatMonthName, monthRange } from '@/lib/format';
 import { MonthSummary } from '@/components/dashboard/month-summary';
 import { CategoryBreakdown } from '@/components/dashboard/category-breakdown';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
+import { NCEDistribution } from '@/components/dashboard/nce-distribution';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
@@ -28,9 +29,10 @@ export default async function DashboardPage({
     .single();
 
   const firstName = (profile?.full_name ?? user?.email ?? '').split(' ')[0].split('@')[0];
+  const capitalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
   // Busca em paralelo
-  const [summaryRes, breakdownRes, recentRes, prevRes] = await Promise.all([
+  const [summaryRes, breakdownRes, recentRes, prevRes, nceRes] = await Promise.all([
     supabase
       .from('monthly_summary')
       .select('*')
@@ -60,6 +62,10 @@ export default async function DashboardPage({
         .eq('month_num', prevM)
         .maybeSingle();
     })(),
+    supabase
+      .from('nce_distribution')
+      .select('group_name, total')
+      .eq('month', start),
   ]);
 
   const summary = summaryRes.data ?? {
@@ -70,7 +76,7 @@ export default async function DashboardPage({
     transactions_count: 0,
   };
 
-  const capitalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  const totalIncome = Number(summary.total_receita ?? 0);
 
   return (
     <div className="space-y-8">
@@ -100,6 +106,9 @@ export default async function DashboardPage({
 
       {/* Resumo do mês */}
       <MonthSummary summary={summary} prevResult={prevRes.data?.resultado_liquido ?? null} />
+
+      {/* Assinatura Valoria + distribuição NCE */}
+      <NCEDistribution items={nceRes.data ?? []} totalIncome={totalIncome} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr,1fr]">
         <CategoryBreakdown items={breakdownRes.data ?? []} />

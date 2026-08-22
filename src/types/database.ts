@@ -1,6 +1,7 @@
 export type TransactionKind = 'receita' | 'despesa' | 'reserva';
 export type ImportSource = 'manual' | 'csv' | 'ofx';
 export type ImportStatus = 'pending' | 'processed' | 'failed';
+export type CategoryGroup = 'necessidades' | 'construcao' | 'estilo' | 'livre';
 
 export interface Profile {
   id: string;
@@ -21,6 +22,7 @@ export interface Category {
   icon: string | null;
   sort_order: number;
   archived: boolean;
+  group: CategoryGroup | null;
   created_at: string;
 }
 
@@ -86,7 +88,6 @@ export interface Import {
   processed_at: string | null;
 }
 
-// Simplified Database type — em produção você gera com `supabase gen types`
 export interface Database {
   public: {
     Tables: {
@@ -120,6 +121,15 @@ export interface Database {
           category_name: string | null;
           category_color: string | null;
           kind: TransactionKind | null;
+          total: number;
+          transactions_count: number;
+        };
+      };
+      nce_distribution: {
+        Row: {
+          user_id: string;
+          month: string;
+          group_name: CategoryGroup | null;
           total: number;
           transactions_count: number;
         };
