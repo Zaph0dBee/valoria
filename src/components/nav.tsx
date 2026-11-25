@@ -12,6 +12,7 @@ import {
   Moon,
   Sun,
   LogOut,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
+import { ProfileSwitcher, type SwitcherProfile } from '@/components/profile-switcher';
+import type { ProfileSelection } from '@/lib/profile-selection';
 
 const items = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
@@ -34,7 +37,19 @@ const items = [
   { href: '/importar', label: 'Importar', icon: Upload },
 ];
 
-export function AppNav({ userName, userEmail }: { userName: string; userEmail: string }) {
+export function AppNav({
+  userName,
+  userEmail,
+  profiles,
+  activeProfile,
+  showSelector,
+}: {
+  userName: string;
+  userEmail: string;
+  profiles: SwitcherProfile[];
+  activeProfile: ProfileSelection;
+  showSelector: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -55,6 +70,12 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
             <ValoriaLogo className="h-6 text-primary" />
           </Link>
         </div>
+
+        {showSelector && (
+          <div className="px-3 pt-4">
+            <ProfileSwitcher profiles={profiles} active={activeProfile} />
+          </div>
+        )}
 
         <nav className="flex-1 px-3 py-4 space-y-1">
           {items.map(({ href, label, icon: Icon }) => {
@@ -103,6 +124,12 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
             <DropdownMenuContent align="end" side="top">
               <DropdownMenuLabel>Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/empresas">
+                  <Building2 className="h-4 w-4" />
+                  Minhas empresas
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                 <LogOut className="h-4 w-4" />
                 Sair
@@ -118,10 +145,12 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
           <Link href="/dashboard">
             <ValoriaLogo className="h-5 text-primary" />
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {showSelector && <ProfileSwitcher profiles={profiles} active={activeProfile} compact />}
             <Button
               variant="ghost"
               size="icon"
+              aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -137,6 +166,12 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{userName}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/empresas">
+                    <Building2 className="h-4 w-4" />
+                    Minhas empresas
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                   <LogOut className="h-4 w-4" />
                   Sair

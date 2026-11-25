@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/transacoes') ||
     pathname.startsWith('/categorias') ||
     pathname.startsWith('/metas') ||
-    pathname.startsWith('/importar');
+    pathname.startsWith('/importar') ||
+    pathname.startsWith('/empresas');
 
   if (!userId && isProtectedRoute) {
     const url = request.nextUrl.clone();

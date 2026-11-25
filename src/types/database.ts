@@ -479,6 +479,7 @@ export type Database = {
           kind: TransactionKind | null;
           total: number;
           transactions_count: number;
+          profile_id: string;
         };
         Relationships: [];
       };
@@ -489,6 +490,7 @@ export type Database = {
           group_name: CategoryGroup | null;
           total: number;
           transactions_count: number;
+          profile_id: string;
         };
         Relationships: [];
       };
@@ -496,6 +498,14 @@ export type Database = {
     Functions: {
       seed_default_categories: {
         Args: { target_user: string };
+        Returns: undefined;
+      };
+      apply_pj_template: {
+        Args: { target_profile: string };
+        Returns: undefined;
+      };
+      delete_company: {
+        Args: { target_profile: string };
         Returns: undefined;
       };
       get_monthly_financial_summary: {
