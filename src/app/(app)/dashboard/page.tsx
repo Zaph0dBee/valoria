@@ -20,6 +20,11 @@ type FinancialSummary = {
   disponivel_antes_aportes: number;
   saldo_final: number;
   transactions_count: number;
+  transf_recebidas?: number;
+  transf_enviadas?: number;
+  entradas_transferidas?: number;
+  pro_labore_pago?: number;
+  lucros_distribuidos?: number;
 };
 
 const EMPTY_SUMMARY: FinancialSummary = {
@@ -77,7 +82,7 @@ export default async function DashboardPage({
     .order('total', { ascending: false });
   let recentQuery = supabase
     .from('transactions')
-    .select('id, occurred_on, amount, kind, description, category_id, categories(name, color)')
+    .select('id, occurred_on, amount, kind, description, category_id, profile_id, counterpart_profile_id, transfer_reason, categories(name, color)')
     .gte('occurred_on', start)
     .lte('occurred_on', end)
     .order('occurred_on', { ascending: false })
@@ -85,7 +90,7 @@ export default async function DashboardPage({
     .limit(10);
   if (profileId) {
     breakdownQuery = breakdownQuery.eq('profile_id', profileId);
-    recentQuery = recentQuery.eq('profile_id', profileId);
+    recentQuery = recentQuery.or(`profile_id.eq.${profileId},counterpart_profile_id.eq.${profileId}`);
   }
 
   const [summaryRes, breakdownRes, recentRes, prevRes, nceRes, openingRes] = await Promise.all([
@@ -109,7 +114,9 @@ export default async function DashboardPage({
 
   const summary = (summaryRes.data?.[0] ?? { ...EMPTY_SUMMARY, month: start }) as FinancialSummary;
   const prevSummary = prevRes.data?.[0] as FinancialSummary | undefined;
-  const totalIncome = Number(summary.total_receita ?? 0);
+  // Base da distribuição Valoria: receitas + pró-labore/lucros recebidos.
+  const totalIncome = Number(summary.total_receita ?? 0) + Number(summary.entradas_transferidas ?? 0);
+  const profileNames = Object.fromEntries(profileCtx.profiles.map((p) => [p.id, profileLabel(p)]));
 
   return (
     <div className="space-y-8">
@@ -152,7 +159,7 @@ export default async function DashboardPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CategoryBreakdown items={breakdownRes.data ?? []} />
-        <RecentTransactions items={recentRes.data ?? []} />
+        <RecentTransactions items={recentRes.data ?? []} viewProfileId={profileId} profileNames={profileNames} />
       </div>
     </div>
   );

@@ -161,3 +161,46 @@ test('importar acompanha a troca de perfil no topo', async ({ page }) => {
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await switchProfile(page, 'Você (PF)');
 });
+
+async function createTransaction(
+  page: Page,
+  opts: { kind: 'Receita' | 'Despesa' | 'Transferência'; amount: string; description: string; date: string; reason?: string; to?: string },
+) {
+  await page.goto('/transacoes');
+  await page.getByRole('button', { name: 'Novo lançamento' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: opts.kind, exact: true }).click();
+  if (opts.reason) {
+    await dialog.getByRole('combobox', { name: 'Motivo' }).click();
+    await page.getByRole('option', { name: opts.reason }).click();
+  }
+  if (opts.to) {
+    await dialog.getByRole('combobox', { name: 'Para' }).click();
+    await page.getByRole('option', { name: opts.to }).click();
+  }
+  await dialog.getByLabel('Data').fill(opts.date);
+  await dialog.getByLabel('Valor (R$)').fill(opts.amount);
+  await dialog.getByLabel('Descrição').fill(opts.description);
+  await dialog.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByText(/Lançamento criado|Transferência registrada/).first()).toBeVisible();
+}
+
+test('pró-labore aparece na PF e não duplica no consolidado', async ({ page }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '10.000,00', description: `Venda ${RUN_ID}`, date: '2026-01-10' });
+  await createTransaction(page, {
+    kind: 'Transferência', reason: 'Pró-labore', to: 'Você (PF)',
+    amount: '3.000,00', description: `Pró-labore ${RUN_ID}`, date: '2026-01-15',
+  });
+
+  await page.goto('/dashboard?y=2026&m=1');
+  await expect(page.getByTestId('summary-resultado')).toContainText('R$ 7.000,00');
+
+  await switchProfile(page, 'Você (PF)');
+  await expect(page.getByTestId('summary-entradas')).toContainText('R$ 3.000,00');
+
+  await switchProfile(page, 'Consolidado');
+  await expect(page.getByTestId('summary-entradas')).toContainText('R$ 10.000,00');
+  await switchProfile(page, 'Você (PF)');
+});

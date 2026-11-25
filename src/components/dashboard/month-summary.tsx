@@ -13,6 +13,9 @@ type Summary = {
   disponivel_antes_aportes: number;
   saldo_final: number;
   transactions_count: number;
+  transf_recebidas?: number;
+  transf_enviadas?: number;
+  entradas_transferidas?: number;
 };
 
 export function MonthSummary({
@@ -32,7 +35,10 @@ export function MonthSummary({
   profileId: string | null;
 }) {
   const opening = Number(summary.saldo_inicial ?? 0);
-  const receita = Number(summary.total_receita ?? 0);
+  // Na PF, pró-labore e lucros recebidos da empresa também são entradas.
+  const receita = Number(summary.total_receita ?? 0) + Number(summary.entradas_transferidas ?? 0);
+  const transfIn = Number(summary.transf_recebidas ?? 0);
+  const transfOut = Number(summary.transf_enviadas ?? 0);
   const despesa = Number(summary.total_despesa ?? 0);
   const operational = Number(summary.resultado_operacional ?? 0);
   const aportes = Number(summary.total_aportes ?? 0);
@@ -98,6 +104,15 @@ export function MonthSummary({
             <SummaryItem label="saídas" value={despesa} tone="destructive" />
             <SummaryItem label="resultado" value={operational} tone={operational >= 0 ? 'positive' : 'destructive'} />
             <SummaryItem label="aportes" value={aportes} tone="primary" />
+            {(transfIn > 0 || transfOut > 0) && (
+              <div data-testid="summary-transferencias">
+                <p className="eyebrow mb-1">transferências</p>
+                <p className="text-sm num text-muted-foreground">
+                  {transfIn > 0 && <span className="block text-positive">+{formatMoney(transfIn)} recebidas</span>}
+                  {transfOut > 0 && <span className="block text-destructive">−{formatMoney(transfOut)} enviadas</span>}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -132,7 +147,7 @@ function SummaryItem({
     primary: 'text-primary',
   };
   return (
-    <div>
+    <div data-testid={`summary-${label}`}>
       <p className="eyebrow mb-1">{label}</p>
       <p className={cn('font-display text-2xl num tracking-tight', colors[tone])}>
         {formatMoney(value)}
