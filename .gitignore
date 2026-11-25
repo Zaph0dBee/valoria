@@ -21,3 +21,6 @@ supabase/.temp/
 e2e/.auth/
 test-results/
 playwright-report/
+
+# Superpowers (rascunhos de execução)
+.superpowers/
