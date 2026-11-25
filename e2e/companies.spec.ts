@@ -147,3 +147,17 @@ test('mesmo CSV em perfis diferentes', async ({ page }) => {
   await page.goto('/importar');
   await switchProfile(page, 'Você (PF)');
 });
+
+test('importar acompanha a troca de perfil no topo', async ({ page }) => {
+  await page.goto('/importar');
+  await switchProfile(page, 'Você (PF)');
+  await switchProfile(page, COMPANY);
+  await page.locator('input[type=file]').setInputFiles({
+    name: `troca-${RUN_ID}.csv`,
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`Data;Descrição;Valor\n03/11/2026;Troca ${RUN_ID};-1,00\n`, 'latin1'),
+  });
+  await expect(page.getByRole('combobox', { name: 'De quem é este extrato?' })).toContainText(COMPANY);
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await switchProfile(page, 'Você (PF)');
+});

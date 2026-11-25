@@ -158,4 +158,30 @@ do $$ declare v_pj uuid; begin
   execute 'reset role';
 end $$;
 
+-- t2_09_pf_e_pj_mesmo_mes (após remover a chave antiga user_id,year,month)
+do $$ declare a constant uuid := 'bbbbbbbb-0000-0000-0000-000000000001'; v_pj uuid; r record; begin
+  select id into v_pj from public.financial_profiles where user_id = a and kind = 'pj' and name = 'Bia LTDA';
+  insert into public.monthly_balances (user_id, profile_id, year, month, opening_balance)
+    values (a, public.pf_profile_id(a), 2026, 3, 70)
+    on conflict (profile_id, year, month) do update set opening_balance = excluded.opening_balance;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  select * into r from public.get_monthly_financial_summary(2026, 3, v_pj);
+  if r.saldo_inicial <> 500 then raise exception 't2_09 PJ: %', r; end if;
+  select * into r from public.get_monthly_financial_summary(2026, 3, public.pf_profile_id(a));
+  if r.saldo_inicial <> 70 then raise exception 't2_09 PF: %', r; end if;
+end $$;
+
+-- t2_12_nao_mover_para_empresa_arquivada
+do $$ declare a constant uuid := 'bbbbbbbb-0000-0000-0000-000000000001'; v_arch uuid; v_tx uuid; begin
+  insert into public.financial_profiles (user_id, kind, name) values (a, 'pj', 'Arquivada') returning id into v_arch;
+  insert into public.transactions (user_id, profile_id, occurred_on, amount, kind, description)
+    values (a, public.pf_profile_id(a), '2026-06-01', 5, 'despesa', 'mover') returning id into v_tx;
+  update public.financial_profiles set archived = true where id = v_arch;
+  begin
+    update public.transactions set profile_id = v_arch where id = v_tx;
+    raise exception 't2_12: moveu lançamento para empresa arquivada';
+  exception when sqlstate '23514' then null; end;
+  update public.transactions set description = 'editado' where id = v_tx;
+end $$;
+
 select 'ALL PASSED' as result;

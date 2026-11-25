@@ -34,6 +34,7 @@ async function validateRelations(
   supabase: SupabaseClient,
   userId: string,
   input: RelationInput,
+  options: { allowArchivedProfile?: boolean } = {},
 ): Promise<string | null> {
   if (input.subcategory_id && !input.category_id) {
     return 'Selecione uma categoria antes da subcategoria';
@@ -47,6 +48,9 @@ async function validateRelations(
     .maybeSingle();
   if (profileError) return profileError.message;
   if (!profile) return 'Perfil não encontrado';
+  if (profile.archived && !options.allowArchivedProfile) {
+    return 'Este perfil está arquivado. Reative a empresa para lançar nela.';
+  }
   if (profile.kind === 'pj' && input.kind === 'reserva') {
     return 'Empresas não fazem aporte em metas. Transfira para a PF primeiro.';
   }
@@ -160,7 +164,11 @@ export async function updateTransaction(
       parsed.data.reserve_id !== undefined ? parsed.data.reserve_id : existing.reserve_id,
   };
 
-  const relationError = await validateRelations(supabase, user.id, merged);
+  // Editar um lançamento que já está numa empresa arquivada é permitido;
+  // mover um lançamento para uma empresa arquivada, não.
+  const relationError = await validateRelations(supabase, user.id, merged, {
+    allowArchivedProfile: merged.profile_id === existing.profile_id,
+  });
   if (relationError) return { error: relationError };
 
   const { error } = await supabase

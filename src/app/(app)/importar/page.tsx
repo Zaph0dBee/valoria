@@ -32,7 +32,9 @@ export default async function ImportarPage() {
         </p>
       </div>
 
+      {/* key: ao trocar de perfil no topo, o formulário recomeça no perfil novo. */}
       <ImportClient
+        key={profileId ?? 'consolidado'}
         categories={catRes.data ?? []}
         profiles={profileCtx.activeProfiles.map(({ id, kind, name, color }) => ({ id, kind, name, color }))}
         defaultProfileId={profileId ?? (profileCtx.showSelector ? '' : (profileCtx.pf?.id ?? ''))}
