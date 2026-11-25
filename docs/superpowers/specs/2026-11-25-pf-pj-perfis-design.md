@@ -49,9 +49,13 @@ pessoa e zero ou mais perfis PJ (empresas).
   actions, triggers de integridade no banco, RLS "dono tudo".
 - Migrations incrementais em `supabase/migrations/`, idempotentes
   (`if not exists`, `create or replace`), preservando usuários atuais.
-- O banco de produção hoje está numa organização Supabase sem acesso do
-  agente: migrations são aplicadas pelo dono via SQL Editor (ou após
-  reconectar o MCP). A migration `20261125000001` deve ser aplicada antes.
+- **Produção tem usuários reais** (27 contas em 2026-11-25). A migração de
+  perfis precisa ser segura para rodar sobre esses dados: backfill dentro da
+  mesma transação, `not null` só depois do backfill, e conferência por
+  contagem (nenhum lançamento/categoria sem perfil) antes de publicar o app.
+- Migrations aplicadas pelo agente via Supabase MCP (projeto
+  `tgtsfodmdoclscklhglz`); o Supabase registra a versão com o horário da
+  aplicação, então o arquivo local é renomeado para bater.
 - O app vai migrar para uma VPS (Supabase self-hosted). Nada aqui pode
   depender de recurso exclusivo do Supabase Cloud.
 - Testes: Vitest para lógica pura, Playwright (`e2e/`) para fluxos; testes
@@ -97,6 +101,11 @@ pode ser arquivado nem apagado.
 - `categories.profile_id` — categorias são **por perfil** (empresa tem as suas)
 - `monthly_balances.profile_id` — unique passa a `(user_id, profile_id, year, month)`
 - `imports.profile_id`
+- `budgets.profile_id` e `recurring_transactions.profile_id` (Parte 2 —
+  orçamento e recorrências; existem só no banco, sem telas e com 0 linhas em
+  2026-11-25, mas entram já com perfil para que as telas futuras nasçam
+  certas; `generate_recurring_transactions` copia o `profile_id` da regra
+  para o lançamento gerado)
 
 Subcategorias herdam o perfil da categoria (não precisam de coluna).
 Metas (`reserves`) **continuam por usuário** (decisão do agente, v1): um
