@@ -55,6 +55,7 @@ const KIND_LABELS: Record<TransactionKind, string> = {
   receita: 'Receita',
   despesa: 'Despesa',
   reserva: 'Aporte',
+  transferencia: 'Transferência',
 };
 
 export function TransactionsClient({

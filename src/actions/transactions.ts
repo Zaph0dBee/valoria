@@ -12,7 +12,7 @@ const TransactionSchema = z.object({
   profile_id: IdSchema,
   occurred_on: DateSchema,
   amount: z.coerce.number().finite().positive(),
-  kind: z.enum(['receita', 'despesa', 'reserva']),
+  kind: z.enum(['receita', 'despesa', 'reserva', 'transferencia']),
   category_id: z.string().uuid().nullable().optional(),
   subcategory_id: z.string().uuid().nullable().optional(),
   reserve_id: z.string().uuid().nullable().optional(),

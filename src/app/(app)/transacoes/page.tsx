@@ -18,7 +18,7 @@ export default async function TransacoesPage({
 
   let txQuery = supabase
     .from('transactions')
-    .select('id, profile_id, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name), financial_profiles(name, color, kind)')
+    .select('id, profile_id, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name), financial_profiles!transactions_profile_id_fkey(name, color, kind)')
     .order('occurred_on', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(200);

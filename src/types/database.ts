@@ -6,7 +6,10 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type TransactionKind = 'receita' | 'despesa' | 'reserva';
+export type TransactionKind = 'receita' | 'despesa' | 'reserva' | 'transferencia';
+/** Categorias nunca são de transferência. */
+export type CategoryKind = Exclude<TransactionKind, 'transferencia'>;
+export type TransferReason = 'pro_labore' | 'lucros' | 'aporte_capital' | 'outro';
 export type ImportSource = 'manual' | 'csv' | 'ofx';
 export type ImportStatus = 'pending' | 'processed' | 'failed';
 export type CategoryGroup = 'necessidades' | 'construcao' | 'estilo' | 'livre';
@@ -92,7 +95,7 @@ export type Database = {
           user_id: string;
           profile_id: string;
           name: string;
-          kind: TransactionKind;
+          kind: CategoryKind;
           color: string;
           icon: string | null;
           sort_order: number;
@@ -112,7 +115,7 @@ export type Database = {
           user_id: string;
           profile_id?: string;
           name: string;
-          kind: TransactionKind;
+          kind: CategoryKind;
           color?: string;
           icon?: string | null;
           sort_order?: number;
@@ -132,7 +135,7 @@ export type Database = {
           user_id?: string;
           profile_id?: string;
           name?: string;
-          kind?: TransactionKind;
+          kind?: CategoryKind;
           color?: string;
           icon?: string | null;
           sort_order?: number;
@@ -226,6 +229,8 @@ export type Database = {
           source: ImportSource;
           import_id: string | null;
           reserve_id: string | null;
+          counterpart_profile_id: string | null;
+          transfer_reason: TransferReason | null;
           created_at: string;
           updated_at: string;
         };
@@ -243,6 +248,8 @@ export type Database = {
           source?: ImportSource;
           import_id?: string | null;
           reserve_id?: string | null;
+          counterpart_profile_id?: string | null;
+          transfer_reason?: TransferReason | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -260,6 +267,8 @@ export type Database = {
           source?: ImportSource;
           import_id?: string | null;
           reserve_id?: string | null;
+          counterpart_profile_id?: string | null;
+          transfer_reason?: TransferReason | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -527,6 +536,11 @@ export type Database = {
           disponivel_antes_aportes: number;
           saldo_final: number;
           transactions_count: number;
+          transf_recebidas: number;
+          transf_enviadas: number;
+          entradas_transferidas: number;
+          pro_labore_pago: number;
+          lucros_distribuidos: number;
         }[];
       };
     };
@@ -536,6 +550,7 @@ export type Database = {
       import_status: ImportStatus;
       category_group: CategoryGroup;
       profile_kind: ProfileKind;
+      transfer_reason: TransferReason;
     };
     CompositeTypes: Record<never, never>;
   };

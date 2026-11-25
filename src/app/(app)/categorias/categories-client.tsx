@@ -30,7 +30,7 @@ import {
   updateCategory,
   updateSubcategory,
 } from '@/actions/categories';
-import type { CategoryGroup, TransactionKind } from '@/types/database';
+import type { CategoryGroup, CategoryKind } from '@/types/database';
 import { formatMoneyCompact } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { parseMoney, formatMoneyInput } from '@/lib/money';
@@ -41,7 +41,7 @@ type ExpenseNature = 'fixa' | 'variavel';
 type Cat = {
   id: string;
   name: string;
-  kind: TransactionKind;
+  kind: CategoryKind;
   color: string;
   sort_order: number;
   group: CategoryGroup | null;
@@ -76,7 +76,7 @@ const PRESET_COLORS = [
   '#9333ea', '#0369a1', '#be123c', '#4338ca', '#0891b2', '#65a30d', '#78716c',
 ];
 
-const KIND_LABELS: Record<TransactionKind, string> = {
+const KIND_LABELS: Record<CategoryKind, string> = {
   receita: 'Receitas',
   despesa: 'Despesas',
   reserva: 'Construção / Aportes',
@@ -130,7 +130,7 @@ export function CategoriesClient({
   const kinds = isCompany
     ? (['receita', 'despesa'] as const)
     : (['receita', 'despesa', 'reserva'] as const);
-  const [newCatKind, setNewCatKind] = React.useState<TransactionKind | null>(null);
+  const [newCatKind, setNewCatKind] = React.useState<CategoryKind | null>(null);
   const [subCatFor, setSubCatFor] = React.useState<Cat | null>(null);
   const [editingCategory, setEditingCategory] = React.useState<Cat | null>(null);
   const [editingSubcategory, setEditingSubcategory] = React.useState<Sub | null>(null);
@@ -331,7 +331,7 @@ function NewCategoryDialog({
   profileId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  kind: TransactionKind | null;
+  kind: CategoryKind | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -486,7 +486,7 @@ function PlanningFields({
   setDefaultReserveId,
   reserves,
 }: {
-  kind: TransactionKind;
+  kind: CategoryKind;
   groupValue: CategoryGroup | 'none' | 'inherit';
   setGroupValue: (value: CategoryGroup | 'none' | 'inherit') => void;
   allowInheritedGroup?: boolean;
