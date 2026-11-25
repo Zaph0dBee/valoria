@@ -36,7 +36,7 @@ export default async function LandingPage() {
           liberdade.
         </h1>
 
-        <div className="mt-16 grid gap-16 md:grid-cols-[1fr,auto] md:items-end">
+        <div className="mt-16 grid gap-16 md:grid-cols-[1fr_auto] md:items-end">
           <div className="max-w-xl">
             <p className="voice text-2xl leading-snug text-primary/90 mb-4">
               &ldquo;Aqui a gente organiza primeiro a cabeça, depois a planilha.&rdquo;

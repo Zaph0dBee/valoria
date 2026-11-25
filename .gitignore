@@ -16,3 +16,8 @@ next-env.d.ts
 supabase/.temp/
 
 .playwright-mcp/
+
+# Playwright
+e2e/.auth/
+test-results/
+playwright-report/

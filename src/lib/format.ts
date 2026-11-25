@@ -72,3 +72,12 @@ export function monthRange(year: number, month: number): { start: string; end: s
     end: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
   };
 }
+
+/** Percentual no padrão brasileiro: formatPercent(7.5, 1) → "7,5%". */
+export function formatPercent(value: number, fractionDigits = 0): string {
+  const n = Number.isFinite(value) ? value : 0;
+  return `${n.toLocaleString('pt-BR', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}%`;
+}

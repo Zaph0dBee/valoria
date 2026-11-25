@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import type { TransactionKind } from '@/types/database';
+import { splitDuplicates, type DedupeRow } from '@/lib/import-dedupe';
 
 export type ParsedRow = {
   occurred_on: string;
@@ -50,7 +51,7 @@ export async function importTransactions(input: {
   if (categoryIds.length) {
     const { data: ownedCategories, error: categoriesError } = await supabase
       .from('categories')
-      .select('id')
+      .select('id, kind')
       .eq('user_id', user.id)
       .in('id', categoryIds);
 
@@ -58,6 +59,38 @@ export async function importTransactions(input: {
     if ((ownedCategories?.length ?? 0) !== categoryIds.length) {
       return { error: 'Uma ou mais categorias do arquivo não pertencem à sua conta' };
     }
+    const kindById = new Map(ownedCategories!.map((c) => [c.id, c.kind]));
+    const mismatch = parsed.data.rows.find(
+      (row) => row.category_id && kindById.get(row.category_id) !== row.kind,
+    );
+    if (mismatch) {
+      return {
+        error: `A categoria de "${mismatch.description}" não corresponde ao tipo do lançamento`,
+      };
+    }
+  }
+
+  // Evita duplicar lançamentos ao importar o mesmo extrato (ou extratos que se sobrepõem).
+  const dates = parsed.data.rows.map((row) => row.occurred_on).sort();
+  const existing: DedupeRow[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('occurred_on, amount, kind, description')
+      .eq('user_id', user.id)
+      .gte('occurred_on', dates[0])
+      .lte('occurred_on', dates[dates.length - 1])
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) return { error: error.message };
+    existing.push(...((data ?? []) as DedupeRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+
+  const { fresh, duplicates } = splitDuplicates(parsed.data.rows, existing);
+  if (fresh.length === 0) {
+    return { ok: true, count: 0, skipped: duplicates.length };
   }
 
   const { data: imp, error: impErr } = await supabase
@@ -73,7 +106,7 @@ export async function importTransactions(input: {
 
   if (impErr || !imp) return { error: impErr?.message ?? 'Erro criando importação' };
 
-  const inserts = parsed.data.rows.map((row) => ({
+  const inserts = fresh.map((row) => ({
     user_id: user.id,
     occurred_on: row.occurred_on,
     amount: row.amount,
@@ -110,5 +143,5 @@ export async function importTransactions(input: {
   revalidatePath('/dashboard');
   revalidatePath('/transacoes');
   revalidatePath('/importar');
-  return { ok: true, count: inserts.length };
+  return { ok: true, count: inserts.length, skipped: duplicates.length };
 }

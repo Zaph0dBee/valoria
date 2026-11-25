@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMoney } from './money';
+import { formatMoneyInput, parseMoney } from './money';
 
 describe('parseMoney', () => {
   it.each([
@@ -48,5 +48,24 @@ describe('parseMoney', () => {
     expect(parseMoney(null)).toBeNull();
     expect(parseMoney(undefined)).toBeNull();
     expect(parseMoney(Number.NaN)).toBeNull();
+  });
+});
+
+describe('formatMoneyInput', () => {
+  it('formata no padrão brasileiro para preencher formulários', () => {
+    expect(formatMoneyInput(345.67)).toBe('345,67');
+    expect(formatMoneyInput(1500)).toBe('1.500,00');
+    expect(formatMoneyInput('1234.5')).toBe('1.234,50');
+  });
+
+  it('o resultado volta ao mesmo número com parseMoney', () => {
+    for (const v of [0.01, 12.3, 1500, 1234567.89]) {
+      expect(parseMoney(formatMoneyInput(v))).toBeCloseTo(v, 10);
+    }
+  });
+
+  it('retorna vazio para null/undefined', () => {
+    expect(formatMoneyInput(null)).toBe('');
+    expect(formatMoneyInput(undefined)).toBe('');
   });
 });

@@ -27,7 +27,7 @@ import { createTransaction, deleteTransaction, updateTransaction } from '@/actio
 import { formatDate, formatMoney, todayISO } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { TransactionKind } from '@/types/database';
-import { parseMoney } from '@/lib/money';
+import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 type Tx = {
   id: string;
@@ -80,6 +80,13 @@ export function TransactionsClient({
     setOpen(true);
   }
 
+  // Ao fechar, remove ?new=1&kind=…&reserve=… do endereço para que recarregar
+  // a página não reabra o formulário.
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next && openNewOnMount) router.replace('/transacoes', { scroll: false });
+  }
+
   function openEdit(tx: Tx) {
     setEditing(tx);
     setOpen(true);
@@ -120,26 +127,34 @@ export function TransactionsClient({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Data</TableHead>
+                <TableHead className="hidden sm:table-cell w-[100px]">Data</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Categoria / destino</TableHead>
+                <TableHead className="hidden sm:table-cell">Categoria / destino</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+                <TableHead className="w-10 sm:w-[80px]"><span className="sr-only">Ações</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {initialTransactions.map((tx) => (
                 <TableRow key={tx.id}>
-                  <TableCell className="num text-muted-foreground text-xs">
+                  <TableCell className="hidden sm:table-cell num text-muted-foreground text-xs">
                     {formatDate(tx.occurred_on, { day: '2-digit', month: '2-digit', year: '2-digit' })}
                   </TableCell>
-                  <TableCell className="font-medium">{tx.description}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium pr-2 sm:pr-4">
+                    {tx.description}
+                    <span className="sm:hidden mt-1 block text-[11px] font-normal text-muted-foreground num">
+                      {formatDate(tx.occurred_on, { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      {' · '}
+                      {tx.categories?.name ?? 'Sem categoria'}
+                      {tx.kind === 'reserva' && tx.reserves ? ` · ${tx.reserves.name}` : ''}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <div className="flex flex-col gap-1">
                       {tx.categories ? (
                         <span className="inline-flex items-center gap-2 text-xs">
                           <span
-                            className="h-2 w-2 rounded-full"
+                            className="swatch h-2 w-2 rounded-full"
                             style={{ backgroundColor: tx.categories.color }}
                           />
                           {tx.categories.name}
@@ -157,7 +172,7 @@ export function TransactionsClient({
                   </TableCell>
                   <TableCell
                     className={cn(
-                      'text-right num font-medium',
+                      'text-right num font-medium whitespace-nowrap px-2 sm:px-4',
                       tx.kind === 'receita' && 'text-positive',
                       tx.kind === 'despesa' && 'text-destructive',
                       tx.kind === 'reserva' && 'text-primary',
@@ -166,9 +181,15 @@ export function TransactionsClient({
                     {tx.kind === 'despesa' || tx.kind === 'reserva' ? '−' : '+'}
                     {formatMoney(Number(tx.amount))}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(tx)}>
+                  <TableCell className="pl-0 pr-2 sm:px-4">
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:justify-end">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEdit(tx)}
+                        aria-label={`Editar ${tx.description}`}
+                        title="Editar"
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
@@ -176,6 +197,8 @@ export function TransactionsClient({
                         variant="ghost"
                         onClick={() => handleDelete(tx.id)}
                         className="text-muted-foreground hover:text-destructive"
+                        aria-label={`Apagar ${tx.description}`}
+                        title="Apagar"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -190,7 +213,7 @@ export function TransactionsClient({
 
       <TransactionDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={handleOpenChange}
         categories={categories}
         subcategories={subcategories}
         reserves={reserves}
@@ -333,7 +356,7 @@ function TransactionDialog({
                 type="text"
                 inputMode="decimal"
                 placeholder="0,00"
-                defaultValue={editing?.amount ?? ''}
+                defaultValue={formatMoneyInput(editing?.amount)}
                 required
               />
             </div>
@@ -397,7 +420,7 @@ function TransactionDialog({
                   {filteredCategories.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       <span className="inline-flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
+                        <span className="swatch h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
                         {c.name}
                       </span>
                     </SelectItem>

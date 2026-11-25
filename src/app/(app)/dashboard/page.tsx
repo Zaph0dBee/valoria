@@ -132,7 +132,7 @@ export default async function DashboardPage({
 
       <NCEDistribution items={nceRes.data ?? []} totalIncome={totalIncome} />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr,1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CategoryBreakdown items={breakdownRes.data ?? []} />
         <RecentTransactions items={recentRes.data ?? []} />
       </div>

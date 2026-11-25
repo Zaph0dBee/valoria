@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { OpeningBalanceEditor } from './opening-balance-editor';
 
@@ -49,7 +49,7 @@ export function MonthSummary({
   return (
     <Card className="p-8 bg-paper">
       <div className="space-y-7">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <div className="flex flex-col gap-6">
           <div>
             <p className="eyebrow mb-3">saldo disponível</p>
             <span
@@ -68,13 +68,13 @@ export function MonthSummary({
                 {variation.direction === 'up' && <ArrowUpRight className="h-4 w-4 text-positive" />}
                 {variation.direction === 'down' && <ArrowDownRight className="h-4 w-4 text-destructive" />}
                 {variation.direction === 'flat' && <Minus className="h-4 w-4" />}
-                <span className="num">{variation.pct.toFixed(1)}%</span>
+                <span className="num">{formatPercent(variation.pct, 1)}</span>
                 <span>no resultado operacional vs mês anterior</span>
               </p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-7 gap-y-5 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-7 gap-y-5 min-w-0">
             <div>
               <div className="flex items-center gap-1">
                 <p className="eyebrow">saldo inicial</p>
@@ -152,14 +152,14 @@ function StackedBar({
   return (
     <div>
       <div className="h-2.5 w-full rounded-full overflow-hidden bg-muted flex">
-        <div className="bg-destructive/85" style={{ width: `${despPct}%` }} title={`Despesas: ${despPct.toFixed(1)}%`} />
-        <div className="bg-primary/85" style={{ width: `${aportePct}%` }} title={`Aportes: ${aportePct.toFixed(1)}%`} />
-        <div className="bg-positive/60" style={{ width: `${restPct}%` }} title={`Livre: ${restPct.toFixed(1)}%`} />
+        <div className="bg-destructive/85" style={{ width: `${despPct}%` }} title={`Despesas: ${formatPercent(despPct, 1)}`} />
+        <div className="bg-primary/85" style={{ width: `${aportePct}%` }} title={`Aportes: ${formatPercent(aportePct, 1)}`} />
+        <div className="bg-positive/60" style={{ width: `${restPct}%` }} title={`Livre: ${formatPercent(restPct, 1)}`} />
       </div>
       <div className="flex flex-wrap gap-4 mt-3 text-xs text-muted-foreground">
-        <LegendDot color="bg-destructive/85" label={`Despesas ${despPct.toFixed(0)}%`} />
-        <LegendDot color="bg-primary/85" label={`Aportes ${aportePct.toFixed(0)}%`} />
-        <LegendDot color="bg-positive/60" label={`Livre ${restPct.toFixed(0)}%`} />
+        <LegendDot color="bg-destructive/85" label={`Despesas ${formatPercent(despPct, 0)}`} />
+        <LegendDot color="bg-primary/85" label={`Aportes ${formatPercent(aportePct, 0)}`} />
+        <LegendDot color="bg-positive/60" label={`Livre ${formatPercent(restPct, 0)}`} />
       </div>
     </div>
   );

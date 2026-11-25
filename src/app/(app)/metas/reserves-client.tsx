@@ -18,9 +18,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toaster';
 import { archiveReserve, createReserve, updateReserveStartingAmount } from '@/actions/reserves';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatMoney, formatPercent } from '@/lib/format';
 import type { Reserve } from '@/types/database';
-import { parseMoney } from '@/lib/money';
+import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 export function ReservesClient({ reserves }: { reserves: Reserve[] }) {
   const [open, setOpen] = React.useState(false);
@@ -71,7 +71,7 @@ export function ReservesClient({ reserves }: { reserves: Reserve[] }) {
               <Card key={r.id} className="p-6 group">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
+                    <div className="swatch h-3 w-3 rounded-full" style={{ backgroundColor: r.color }} />
                     <div>
                       <h3 className="font-display text-xl">{r.name}</h3>
                       {r.target_date && (
@@ -101,12 +101,12 @@ export function ReservesClient({ reserves }: { reserves: Reserve[] }) {
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all"
+                      className="swatch h-full rounded-full transition-all"
                       style={{ width: `${pct}%`, backgroundColor: r.color }}
                     />
                   </div>
                   <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                    <span className="num">{pct.toFixed(1)}% concluído</span>
+                    <span className="num">{formatPercent(pct, 1)} concluído</span>
                     {contributions > 0 && <span>{formatMoney(contributions)} em aportes vinculados</span>}
                   </div>
                 </div>
@@ -183,7 +183,7 @@ function AdjustStartingAmountDialog({
               name="starting_amount"
               type="text"
               inputMode="decimal"
-              defaultValue={reserve?.starting_amount ?? 0}
+              defaultValue={formatMoneyInput(reserve?.starting_amount ?? 0)}
               required
             />
           </div>
@@ -217,7 +217,7 @@ function NewReserveDialog({
       target_amount: parseMoney(fd.get('target_amount')) ?? Number.NaN,
       starting_amount: parseMoney(fd.get('starting_amount') || '0') ?? Number.NaN,
       target_date: (fd.get('target_date') as string) || null,
-      color: (fd.get('color') as string) || '#1e3a5f',
+      color: (fd.get('color') as string) || '#B99154',
     });
     setLoading(false);
     if (res.error) {
@@ -260,7 +260,7 @@ function NewReserveDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="color">Cor</Label>
-              <Input id="color" name="color" type="color" defaultValue="#1e3a5f" className="h-10 p-1" />
+              <Input id="color" name="color" type="color" defaultValue="#B99154" className="h-10 p-1" />
             </div>
           </div>
           <DialogFooter>

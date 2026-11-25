@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatPercent } from '@/lib/format';
 import type { TransactionKind } from '@/types/database';
 
 type Item = {
@@ -42,12 +42,12 @@ export function CategoryBreakdown({ items }: { items: Item[] }) {
                 <span className="font-medium">{item.category_name ?? 'Sem categoria'}</span>
                 <span className="num tabular-nums text-muted-foreground">
                   <span className="text-foreground">{formatMoney(value)}</span>
-                  <span className="ml-2 text-xs">{pct.toFixed(0)}%</span>
+                  <span className="ml-2 text-xs">{formatPercent(pct, 0)}</span>
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="swatch h-full rounded-full transition-all"
                   style={{
                     width: `${pct}%`,
                     backgroundColor: item.category_color || 'hsl(var(--primary))',

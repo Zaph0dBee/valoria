@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatPercent } from '@/lib/format';
 import {
   GROUP_REFERENCES,
   GROUP_LABELS,
@@ -90,7 +90,7 @@ export function NCEDistribution({
                     </span>
                     <span className="num text-muted-foreground">
                       {formatMoney(totals.null)} ·{' '}
-                      {((totals.null / totalIncome) * 100).toFixed(0)}%
+                      {formatPercent(((totals.null / totalIncome) * 100), 0)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground/70 mt-1">
@@ -121,22 +121,22 @@ function StackedBar({
         <div
           className="bg-primary transition-all"
           style={{ width: `${Math.min(pct(totals.necessidades), 100)}%` }}
-          title={`Necessidades: ${pct(totals.necessidades).toFixed(1)}%`}
+          title={`Necessidades: ${formatPercent(pct(totals.necessidades), 1)}`}
         />
         <div
           className="bg-accent transition-all"
           style={{ width: `${Math.min(pct(totals.construcao), 100)}%` }}
-          title={`Construção: ${pct(totals.construcao).toFixed(1)}%`}
+          title={`Construção: ${formatPercent(pct(totals.construcao), 1)}`}
         />
         <div
           className="bg-secondary transition-all"
           style={{ width: `${Math.min(pct(totals.estilo), 100)}%` }}
-          title={`Estilo de vida: ${pct(totals.estilo).toFixed(1)}%`}
+          title={`Estilo de vida: ${formatPercent(pct(totals.estilo), 1)}`}
         />
         <div
           className="bg-muted-foreground/50 transition-all"
           style={{ width: `${Math.min(pct(totals.livre), 100)}%` }}
-          title={`Livre: ${pct(totals.livre).toFixed(1)}%`}
+          title={`Livre: ${formatPercent(pct(totals.livre), 1)}`}
         />
       </div>
     </div>
@@ -183,7 +183,7 @@ function GroupRow({
         </div>
         <div className="text-right shrink-0 ml-2">
           <span className="num text-sm font-medium">{formatMoney(value)}</span>
-          <span className="num text-xs text-muted-foreground ml-2">{pct.toFixed(0)}%</span>
+          <span className="num text-xs text-muted-foreground ml-2">{formatPercent(pct, 0)}</span>
         </div>
       </div>
 

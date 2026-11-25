@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/components/ui/toaster';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
+import { decodeStatementText } from '@/lib/decode-text';
 import { importTransactions, type ParsedRow } from '@/actions/imports';
 import { formatDate, formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -46,7 +47,7 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
       return;
     }
     setFilename(file.name);
-    const text = await file.text();
+    const text = decodeStatementText(await file.arrayBuffer());
     const isOFX = file.name.toLowerCase().endsWith('.ofx') || text.includes('<OFX>');
     const src = isOFX ? 'ofx' : 'csv';
     setSource(src);
@@ -85,7 +86,18 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
       toast({ variant: 'destructive', title: 'Erro no import', description: res.error });
       return;
     }
-    toast({ title: `${res.count} lançamentos importados` });
+    const skipped = res.skipped ?? 0;
+    if (res.count === 0 && skipped > 0) {
+      toast({
+        title: 'Nada novo para importar',
+        description: `Os ${skipped} lançamentos deste arquivo já estavam registrados.`,
+      });
+    } else {
+      toast({
+        title: `${res.count} lançamentos importados`,
+        description: skipped > 0 ? `${skipped} já existiam e foram ignorados.` : undefined,
+      });
+    }
     setRows([]);
     setFilename('');
     if (inputRef.current) inputRef.current.value = '';
@@ -223,6 +235,8 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
                         variant="ghost"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={() => removeRow(i)}
+                        aria-label={`Remover ${r.description} da importação`}
+                        title="Remover da importação"
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>

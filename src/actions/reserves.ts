@@ -12,7 +12,7 @@ const ReserveSchema = z.object({
   target_amount: z.coerce.number().finite().positive(),
   starting_amount: z.coerce.number().finite().min(0).default(0),
   target_date: DateSchema,
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#1e3a5f'),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#B99154'),
 });
 
 export async function createReserve(input: z.infer<typeof ReserveSchema>) {

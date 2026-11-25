@@ -73,3 +73,11 @@ function isThousandsGrouped(value: string, sep: string): boolean {
   const [first, ...rest] = groups;
   return /^\d{1,3}$/.test(first) && rest.every((g) => /^\d{3}$/.test(g));
 }
+
+/** Valor para preencher um campo de formulário: 1500 → "1.500,00". */
+export function formatMoneyInput(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

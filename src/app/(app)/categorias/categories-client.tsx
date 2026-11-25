@@ -33,7 +33,7 @@ import {
 import type { CategoryGroup, TransactionKind } from '@/types/database';
 import { formatMoneyCompact } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { parseMoney } from '@/lib/money';
+import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 type Recurrence = 'none' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 type ExpenseNature = 'fixa' | 'variavel';
@@ -96,11 +96,6 @@ const RECURRENCE_LABELS: Record<Recurrence, string> = {
   monthly: 'Mensal',
   yearly: 'Anual',
 };
-
-function moneyForInput(value: number | null): string {
-  if (value === null || value === undefined) return '';
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function parseMoneyInput(value: string): number | null {
   const amount = parseMoney(value);
@@ -185,7 +180,7 @@ export function CategoriesClient({
                       <li key={c.id} className="group">
                         <div className="relative flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-muted transition-colors">
                           <span
-                            className="h-2.5 w-2.5 rounded-full shrink-0 mt-1.5"
+                            className="swatch h-2.5 w-2.5 rounded-full shrink-0 mt-1.5"
                             style={{ backgroundColor: c.color }}
                           />
                           <div className="min-w-0 flex-1">
@@ -206,7 +201,7 @@ export function CategoriesClient({
                           {subs.length > 0 && (
                             <span className="text-xs text-muted-foreground mt-0.5">{subs.length}</span>
                           )}
-                          <div className="absolute right-1 top-1 flex gap-0.5 rounded-md bg-muted opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+                          <div className="absolute right-1 top-1 flex gap-0.5 rounded-md bg-muted opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto">
                             <Button
                               size="icon"
                               variant="ghost"
@@ -254,7 +249,7 @@ export function CategoriesClient({
                                     {formatMoneyCompact(s.planned_amount)}
                                   </span>
                                 )}
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex rounded bg-muted opacity-0 pointer-events-none transition-opacity group-hover/sub:opacity-100 group-hover/sub:pointer-events-auto group-focus-within/sub:opacity-100 group-focus-within/sub:pointer-events-auto">
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex rounded bg-muted opacity-0 pointer-events-none transition-opacity group-hover/sub:opacity-100 group-hover/sub:pointer-events-auto group-focus-within/sub:opacity-100 group-focus-within/sub:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto">
                                   <Button
                                     size="icon"
                                     variant="ghost"
@@ -679,7 +674,7 @@ function EditCategoryDialog({
     setName(category.name);
     setColor(category.color);
     setGroup(category.group ?? (category.kind === 'reserva' ? 'construcao' : 'none'));
-    setPlannedAmount(moneyForInput(category.planned_amount));
+    setPlannedAmount(formatMoneyInput(category.planned_amount));
     setRecurrence(category.recurrence);
     setDayOfMonth(category.day_of_month ? String(category.day_of_month) : '');
     setExpenseNature(category.expense_nature ?? 'none');
@@ -817,7 +812,7 @@ function EditSubcategoryDialog({
     if (!subcategory) return;
     setName(subcategory.name);
     setGroupOverride(subcategory.group_override ?? 'inherit');
-    setPlannedAmount(moneyForInput(subcategory.planned_amount));
+    setPlannedAmount(formatMoneyInput(subcategory.planned_amount));
     setRecurrence(subcategory.recurrence);
     setDayOfMonth(subcategory.day_of_month ? String(subcategory.day_of_month) : '');
     setExpenseNature(subcategory.expense_nature ?? 'none');

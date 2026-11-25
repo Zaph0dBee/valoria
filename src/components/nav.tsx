@@ -145,7 +145,7 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
             </DropdownMenu>
           </div>
         </div>
-        <nav className="container flex overflow-x-auto gap-1 pb-2">
+        <nav className="container flex justify-between gap-0.5 pb-2">
           {items.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
@@ -153,13 +153,13 @@ export function AppNav({ userName, userEmail }: { userName: string; userEmail: s
                 key={href}
                 href={href}
                 className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-1.5 text-xs whitespace-nowrap transition-colors',
+                  'flex flex-col items-center gap-1 rounded-md px-1.5 py-1.5 text-[11px] leading-none whitespace-nowrap transition-colors',
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted',
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-4 w-4" />
                 {label}
               </Link>
             );

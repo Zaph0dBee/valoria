@@ -36,7 +36,7 @@ export function RecentTransactions({ items }: { items: Item[] }) {
               <li key={t.id} className="flex items-center justify-between px-6 py-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="h-2 w-2 rounded-full shrink-0"
+                    className="swatch h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: t.categories?.color || 'hsl(var(--muted-foreground))' }}
                   />
                   <div className="min-w-0">
