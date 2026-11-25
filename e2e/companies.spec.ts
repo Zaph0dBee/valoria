@@ -116,3 +116,34 @@ test('consolidado pede perfil', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Cancelar' }).click();
   await switchProfile(page, 'Você (PF)');
 });
+
+test('mesmo CSV em perfis diferentes', async ({ page }) => {
+  const description = `Importado ${RUN_ID}`;
+  const file = {
+    name: `extrato-${RUN_ID}.csv`,
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`Data;Descrição;Valor\n02/11/2026;${description};-12,34\n`, 'latin1'),
+  };
+  const importInto = async (profile: string) => {
+    await page.goto('/importar');
+    await page.locator('input[type=file]').setInputFiles(file);
+    const select = page.getByRole('combobox', { name: 'De quem é este extrato?' });
+    await expect(select).toContainText(profile);
+    await page.getByRole('button', { name: 'Importar 1' }).click();
+  };
+
+  await page.goto('/importar');
+  await switchProfile(page, 'Você (PF)');
+  await importInto('Você (PF)');
+  await expect(page.getByText('1 lançamentos importados', { exact: true })).toBeVisible();
+
+  await page.goto('/importar');
+  await switchProfile(page, COMPANY);
+  await importInto(COMPANY);
+  await expect(page.getByText('1 lançamentos importados', { exact: true })).toBeVisible();
+
+  await importInto(COMPANY);
+  await expect(page.getByText('Nada novo para importar', { exact: true })).toBeVisible();
+  await page.goto('/importar');
+  await switchProfile(page, 'Você (PF)');
+});

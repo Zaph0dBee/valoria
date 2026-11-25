@@ -20,14 +20,30 @@ import { decodeStatementText } from '@/lib/decode-text';
 import { importTransactions, type ParsedRow } from '@/actions/imports';
 import { formatDate, formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { TransactionKind } from '@/types/database';
+import type { ProfileKind, TransactionKind } from '@/types/database';
+import { profileLabel } from '@/lib/profile-selection';
 
-type Cat = { id: string; name: string; kind: TransactionKind; color: string };
+type Cat = { id: string; profile_id: string; name: string; kind: TransactionKind; color: string };
+type ProfileOption = { id: string; kind: ProfileKind; name: string; color: string };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 2000;
 
-export function ImportClient({ categories }: { categories: Cat[] }) {
+export function ImportClient({
+  categories,
+  profiles,
+  defaultProfileId,
+  showProfileField,
+}: {
+  categories: Cat[];
+  profiles: ProfileOption[];
+  /** Vazio no Consolidado: a pessoa precisa escolher. */
+  defaultProfileId: string;
+  showProfileField: boolean;
+}) {
+  const [profileId, setProfileId] = React.useState(defaultProfileId);
+  const isCompany = profiles.find((p) => p.id === profileId)?.kind === 'pj';
+  const profileCategories = categories.filter((c) => c.profile_id === profileId);
   const router = useRouter();
   const { toast } = useToast();
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -79,8 +95,12 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
 
   async function handleSave() {
     if (rows.length === 0) return;
+    if (!profileId) {
+      toast({ variant: 'destructive', title: 'Escolha de quem é este extrato' });
+      return;
+    }
     setLoading(true);
-    const res = await importTransactions({ source, filename, rows });
+    const res = await importTransactions({ profile_id: profileId, source, filename, rows });
     setLoading(false);
     if (res.error) {
       toast({ variant: 'destructive', title: 'Erro no import', description: res.error });
@@ -156,7 +176,37 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {showProfileField && (
+                  <Select
+                    value={profileId}
+                    onValueChange={(value) => {
+                      setProfileId(value);
+                      const toCompany = profiles.find((p) => p.id === value)?.kind === 'pj';
+                      setRows((prev) =>
+                        prev.map((r) => ({
+                          ...r,
+                          category_id: null,
+                          kind: toCompany && r.kind === 'reserva' ? 'despesa' : r.kind,
+                        })),
+                      );
+                    }}
+                  >
+                    <SelectTrigger aria-label="De quem é este extrato?" className="h-9 w-48 text-sm">
+                      <SelectValue placeholder="De quem é este extrato?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="swatch h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                            {profileLabel(p)}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Button variant="ghost" onClick={reset}>
                   Cancelar
                 </Button>
@@ -195,7 +245,7 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
                         <SelectContent>
                           <SelectItem value="receita">Receita</SelectItem>
                           <SelectItem value="despesa">Despesa</SelectItem>
-                          <SelectItem value="reserva">Aporte</SelectItem>
+                          {!isCompany && <SelectItem value="reserva">Aporte</SelectItem>}
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -208,7 +258,7 @@ export function ImportClient({ categories }: { categories: Cat[] }) {
                           <SelectValue placeholder="—" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories
+                          {profileCategories
                             .filter((c) => c.kind === r.kind)
                             .map((c) => (
                               <SelectItem key={c.id} value={c.id}>

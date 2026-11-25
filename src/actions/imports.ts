@@ -23,12 +23,14 @@ const ParsedRowSchema = z.object({
 });
 
 const ImportSchema = z.object({
+  profile_id: z.string().uuid(),
   source: z.enum(['csv', 'ofx']),
   filename: z.string().trim().min(1).max(255),
   rows: z.array(ParsedRowSchema).min(1).max(2000),
 });
 
 export async function importTransactions(input: {
+  profile_id: string;
   source: 'csv' | 'ofx';
   filename: string;
   rows: ParsedRow[];
@@ -47,17 +49,31 @@ export async function importTransactions(input: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Não autenticado' };
 
+  const { data: profile, error: profileError } = await supabase
+    .from('financial_profiles')
+    .select('id, kind, archived')
+    .eq('id', parsed.data.profile_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (profileError) return { error: profileError.message };
+  if (!profile) return { error: 'Escolha de quem é este extrato' };
+  if (profile.archived) return { error: 'Este perfil está arquivado' };
+  if (profile.kind === 'pj' && parsed.data.rows.some((row) => row.kind === 'reserva')) {
+    return { error: 'Empresas não fazem aporte em metas. Troque o tipo dessas linhas ou importe na PF.' };
+  }
+
   const categoryIds = [...new Set(parsed.data.rows.flatMap((row) => row.category_id ? [row.category_id] : []))];
   if (categoryIds.length) {
     const { data: ownedCategories, error: categoriesError } = await supabase
       .from('categories')
       .select('id, kind')
       .eq('user_id', user.id)
+      .eq('profile_id', parsed.data.profile_id)
       .in('id', categoryIds);
 
     if (categoriesError) return { error: categoriesError.message };
     if ((ownedCategories?.length ?? 0) !== categoryIds.length) {
-      return { error: 'Uma ou mais categorias do arquivo não pertencem à sua conta' };
+      return { error: 'Uma ou mais categorias não pertencem ao perfil escolhido' };
     }
     const kindById = new Map(ownedCategories!.map((c) => [c.id, c.kind]));
     const mismatch = parsed.data.rows.find(
@@ -79,6 +95,7 @@ export async function importTransactions(input: {
       .from('transactions')
       .select('occurred_on, amount, kind, description')
       .eq('user_id', user.id)
+      .eq('profile_id', parsed.data.profile_id)
       .gte('occurred_on', dates[0])
       .lte('occurred_on', dates[dates.length - 1])
       .order('id')
@@ -97,6 +114,7 @@ export async function importTransactions(input: {
     .from('imports')
     .insert({
       user_id: user.id,
+      profile_id: parsed.data.profile_id,
       source: parsed.data.source,
       filename: parsed.data.filename,
       status: 'pending',
@@ -108,6 +126,7 @@ export async function importTransactions(input: {
 
   const inserts = fresh.map((row) => ({
     user_id: user.id,
+    profile_id: parsed.data.profile_id,
     occurred_on: row.occurred_on,
     amount: row.amount,
     kind: row.kind,
