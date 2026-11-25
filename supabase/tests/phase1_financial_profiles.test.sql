@@ -60,10 +60,10 @@ end $$;
 -- t04_upsert_monthly_balance: o upsert do app (onConflict user_id,year,month) segue válido
 insert into public.monthly_balances (user_id, year, month, opening_balance)
   values ('aaaaaaaa-0000-0000-0000-000000000001', 2026, 1, 50)
-  on conflict (user_id, year, month) do update set opening_balance = excluded.opening_balance;
+  on conflict (profile_id, year, month) do update set opening_balance = excluded.opening_balance;
 insert into public.monthly_balances (user_id, year, month, opening_balance)
   values ('aaaaaaaa-0000-0000-0000-000000000001', 2026, 1, 50)
-  on conflict (user_id, year, month) do update set opening_balance = excluded.opening_balance;
+  on conflict (profile_id, year, month) do update set opening_balance = excluded.opening_balance;
 do $$ begin
   if (select count(*) from public.monthly_balances where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') <> 1
      or (select profile_id from public.monthly_balances where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') is null
