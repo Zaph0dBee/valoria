@@ -27,6 +27,7 @@ import { createTransaction, deleteTransaction, updateTransaction } from '@/actio
 import { formatDate, formatMoney, todayISO } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { TransactionKind } from '@/types/database';
+import { parseMoney } from '@/lib/money';
 
 type Tx = {
   id: string;
@@ -250,7 +251,7 @@ function TransactionDialog({
     const fd = new FormData(e.currentTarget);
     const payload = {
       occurred_on: fd.get('occurred_on') as string,
-      amount: Number(String(fd.get('amount')).replace(',', '.')),
+      amount: parseMoney(fd.get('amount')) ?? Number.NaN,
       kind,
       category_id: categoryId || null,
       subcategory_id: subcategoryId || null,

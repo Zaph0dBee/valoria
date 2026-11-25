@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background">
       <AppNav userName={profile?.full_name ?? user.email ?? 'você'} userEmail={user.email ?? ''} />
-      <main className="md:pl-56">
+      <main className="md:pl-60">
         <div className="container max-w-6xl py-8 animate-fade-in">{children}</div>
       </main>
     </div>

@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import type { ParsedRow } from '@/actions/imports';
+import { parseMoney } from '@/lib/money';
 
 // Reconhece colunas em português e inglês, formatos comuns de banco BR
 const DATE_KEYS = ['data', 'date', 'dt', 'data_lancamento', 'data_movimento'];
@@ -21,19 +22,7 @@ function findKey(row: Record<string, unknown>, candidates: string[]): string | n
 }
 
 function parseAmount(raw: unknown): number {
-  if (raw == null) return 0;
-  let s = String(raw).trim();
-  // Remove R$ e espaços
-  s = s.replace(/R\$\s*/gi, '').replace(/\s+/g, '');
-  // Se tem vírgula e ponto, ponto é milhar: "1.234,56"
-  if (s.includes(',') && s.includes('.')) {
-    s = s.replace(/\./g, '').replace(',', '.');
-  } else if (s.includes(',')) {
-    // Só vírgula: decimal BR
-    s = s.replace(',', '.');
-  }
-  const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
+  return parseMoney(raw) ?? 0;
 }
 
 function parseDate(raw: unknown): string | null {

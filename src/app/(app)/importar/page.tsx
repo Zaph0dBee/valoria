@@ -16,7 +16,7 @@ export default async function ImportarPage() {
         <p className="eyebrow mb-1">entrada em massa</p>
         <h1 className="font-display text-4xl tracking-tight">Importar</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Extrato do banco em CSV ou OFX. O Norte reconhece as colunas mais comuns e você revisa antes de salvar.
+          Extrato do banco em CSV ou OFX. O Valoria reconhece as colunas mais comuns e você revisa antes de salvar.
         </p>
       </div>
 

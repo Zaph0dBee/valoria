@@ -33,6 +33,7 @@ import {
 import type { CategoryGroup, TransactionKind } from '@/types/database';
 import { formatMoneyCompact } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { parseMoney } from '@/lib/money';
 
 type Recurrence = 'none' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 type ExpenseNature = 'fixa' | 'variavel';
@@ -102,13 +103,8 @@ function moneyForInput(value: number | null): string {
 }
 
 function parseMoneyInput(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.includes(',')
-    ? trimmed.replace(/\./g, '').replace(',', '.')
-    : trimmed;
-  const amount = Number(normalized);
-  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+  const amount = parseMoney(value);
+  return amount !== null && amount >= 0 ? amount : null;
 }
 
 function plannedAmountForCategory(category: Cat, subs: Sub[]): number | null {
@@ -165,7 +161,7 @@ export function CategoriesClient({
     : null;
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
+    <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
       {(['receita', 'despesa', 'reserva'] as const).map((kind) => {
         const cats = categories.filter((c) => c.kind === kind);
         return (
@@ -187,7 +183,7 @@ export function CategoriesClient({
                     const planned = plannedAmountForCategory(c, subs);
                     return (
                       <li key={c.id} className="group">
-                        <div className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-muted transition-colors">
+                        <div className="relative flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-muted transition-colors">
                           <span
                             className="h-2.5 w-2.5 rounded-full shrink-0 mt-1.5"
                             style={{ backgroundColor: c.color }}
@@ -210,7 +206,7 @@ export function CategoriesClient({
                           {subs.length > 0 && (
                             <span className="text-xs text-muted-foreground mt-0.5">{subs.length}</span>
                           )}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                          <div className="absolute right-1 top-1 flex gap-0.5 rounded-md bg-muted opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
                             <Button
                               size="icon"
                               variant="ghost"
@@ -243,7 +239,7 @@ export function CategoriesClient({
                         {subs.length > 0 && (
                           <ul className="pl-6 mt-0.5">
                             {subs.map((s) => (
-                              <li key={s.id} className="group/sub flex items-center gap-1 rounded px-1 -ml-1 hover:bg-muted/60">
+                              <li key={s.id} className="group/sub relative flex items-center gap-1 rounded px-1 -ml-1 hover:bg-muted/60">
                                 <span className="text-xs text-muted-foreground">·</span>
                                 <button
                                   type="button"
@@ -258,7 +254,7 @@ export function CategoriesClient({
                                     {formatMoneyCompact(s.planned_amount)}
                                   </span>
                                 )}
-                                <div className="opacity-0 group-hover/sub:opacity-100 transition-opacity flex">
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex rounded bg-muted opacity-0 pointer-events-none transition-opacity group-hover/sub:opacity-100 group-hover/sub:pointer-events-auto group-focus-within/sub:opacity-100 group-focus-within/sub:pointer-events-auto">
                                   <Button
                                     size="icon"
                                     variant="ghost"

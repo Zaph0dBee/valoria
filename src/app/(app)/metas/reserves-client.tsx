@@ -20,6 +20,7 @@ import { useToast } from '@/components/ui/toaster';
 import { archiveReserve, createReserve, updateReserveStartingAmount } from '@/actions/reserves';
 import { formatDate, formatMoney } from '@/lib/format';
 import type { Reserve } from '@/types/database';
+import { parseMoney } from '@/lib/money';
 
 export function ReservesClient({ reserves }: { reserves: Reserve[] }) {
   const [open, setOpen] = React.useState(false);
@@ -151,7 +152,7 @@ function AdjustStartingAmountDialog({
 
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const value = Number(String(fd.get('starting_amount')).replace(',', '.'));
+    const value = parseMoney(fd.get('starting_amount')) ?? Number.NaN;
     const res = await updateReserveStartingAmount(reserve.id, value);
     setLoading(false);
 
@@ -213,8 +214,8 @@ function NewReserveDialog({
     const fd = new FormData(e.currentTarget);
     const res = await createReserve({
       name: fd.get('name') as string,
-      target_amount: Number(String(fd.get('target_amount')).replace(',', '.')),
-      starting_amount: Number(String(fd.get('starting_amount') || '0').replace(',', '.')),
+      target_amount: parseMoney(fd.get('target_amount')) ?? Number.NaN,
+      starting_amount: parseMoney(fd.get('starting_amount') || '0') ?? Number.NaN,
       target_date: (fd.get('target_date') as string) || null,
       color: (fd.get('color') as string) || '#1e3a5f',
     });

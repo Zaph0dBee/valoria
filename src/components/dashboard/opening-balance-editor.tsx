@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toaster';
 import { removeMonthlyOpeningBalance, setMonthlyOpeningBalance } from '@/actions/monthly-balances';
+import { parseMoney } from '@/lib/money';
 
 export function OpeningBalanceEditor({
   year,
@@ -37,7 +38,7 @@ export function OpeningBalanceEditor({
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const value = Number(String(fd.get('opening_balance')).replace(',', '.'));
+    const value = parseMoney(fd.get('opening_balance')) ?? Number.NaN;
     const res = await setMonthlyOpeningBalance({ year, month, opening_balance: value });
     setLoading(false);
 
