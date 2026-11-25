@@ -159,4 +159,41 @@ do $$ declare v_pj uuid; v_cat uuid; c constant uuid := 'aaaaaaaa-0000-0000-0000
   then raise exception 't11_apagar_usuario: dados ficaram'; end if;
 end $$;
 
+-- t09_resumo_por_perfil: dados conhecidos do usuário A (PF + "Empresa Teste"), mês 2026-03
+do $$ declare
+  a constant uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
+  v_pf uuid := public.pf_profile_id('aaaaaaaa-0000-0000-0000-000000000001');
+  v_pj uuid;
+begin
+  select id into v_pj from public.financial_profiles where user_id = a and kind = 'pj';
+  update public.monthly_balances set opening_balance = 0 where user_id = a;
+  delete from public.transactions where user_id = a;
+  insert into public.transactions (user_id, profile_id, occurred_on, amount, kind, description) values
+    (a, v_pf, '2026-03-05', 1000, 'receita', 'sal'),
+    (a, v_pf, '2026-03-06', 300, 'despesa', 'mercado'),
+    (a, v_pf, '2026-03-07', 100, 'reserva', 'aporte'),
+    (a, v_pj, '2026-03-08', 200, 'receita', 'venda');
+end $$;
+
+select set_config('request.jwt.claims',
+  json_build_object('sub', 'aaaaaaaa-0000-0000-0000-000000000001', 'role', 'authenticated')::text, true);
+do $$ declare
+  v_pf uuid := public.pf_profile_id('aaaaaaaa-0000-0000-0000-000000000001');
+  v_pj uuid;
+  r record;
+begin
+  select id into v_pj from public.financial_profiles
+    where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and kind = 'pj';
+  select * into r from public.get_monthly_financial_summary(2026, 3, v_pf);
+  if (r.total_receita, r.total_despesa, r.total_aportes, r.saldo_final) <> (1000, 300, 100, 600)
+  then raise exception 't09_pf: %', r; end if;
+  select * into r from public.get_monthly_financial_summary(2026, 3, v_pj);
+  if (r.total_receita, r.saldo_final) <> (200, 200) then raise exception 't09_pj: %', r; end if;
+  select * into r from public.get_monthly_financial_summary(2026, 3, null::uuid);
+  if (r.total_receita, r.saldo_final, r.transactions_count) <> (1200, 800, 4)
+  then raise exception 't09_consolidado: %', r; end if;
+  select * into r from public.get_monthly_financial_summary(2026, 4);
+  if r.saldo_inicial <> 800 then raise exception 't09_abril_herda_saldo: %', r; end if;
+end $$;
+
 select 'ALL PASSED' as result;

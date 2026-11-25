@@ -447,3 +447,130 @@ $$;
 revoke all on function public.generate_recurring_transactions(int, int, boolean) from public;
 
 grant execute on function public.generate_recurring_transactions(int, int, boolean) to authenticated;
+
+-- 8) Resumo mensal por perfil ---------------------------------------------------
+-- target_profile = id  → só aquele perfil (com a própria âncora de saldo inicial);
+-- target_profile = null → consolidado: soma, perfil a perfil, do cálculo individual.
+create or replace function public.get_monthly_financial_summary(
+  target_year int,
+  target_month int,
+  target_profile uuid
+)
+returns table (
+  month date,
+  saldo_inicial numeric,
+  total_receita numeric,
+  total_despesa numeric,
+  resultado_operacional numeric,
+  total_aportes numeric,
+  disponivel_antes_aportes numeric,
+  saldo_final numeric,
+  transactions_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with params as (
+    select
+      make_date(target_year, target_month, 1) as month_start,
+      (make_date(target_year, target_month, 1) + interval '1 month')::date as next_month
+  ),
+  per_profile as (
+    select
+      coalesce(a.opening_balance, 0) + coalesce((
+        select sum(
+          case t.kind
+            when 'receita' then t.amount
+            when 'despesa' then -t.amount
+            when 'reserva' then -t.amount
+          end
+        )
+        from public.transactions t
+        where t.user_id = auth.uid()
+          and t.profile_id = fp.id
+          and t.occurred_on < p.month_start
+          and (a.anchor_month is null or t.occurred_on >= a.anchor_month)
+      ), 0) as opening_balance,
+      m.receita,
+      m.despesa,
+      m.aportes,
+      m.tx_count
+    from public.financial_profiles fp
+    cross join params p
+    left join lateral (
+      select make_date(mb.year, mb.month, 1) as anchor_month, mb.opening_balance
+      from public.monthly_balances mb
+      where mb.user_id = auth.uid()
+        and mb.profile_id = fp.id
+        and make_date(mb.year, mb.month, 1) <= p.month_start
+      order by mb.year desc, mb.month desc
+      limit 1
+    ) a on true
+    cross join lateral (
+      select
+        coalesce(sum(t.amount) filter (where t.kind = 'receita'), 0) as receita,
+        coalesce(sum(t.amount) filter (where t.kind = 'despesa'), 0) as despesa,
+        coalesce(sum(t.amount) filter (where t.kind = 'reserva'), 0) as aportes,
+        count(t.id) as tx_count
+      from public.transactions t
+      where t.user_id = auth.uid()
+        and t.profile_id = fp.id
+        and t.occurred_on >= p.month_start
+        and t.occurred_on < p.next_month
+    ) m
+    where fp.user_id = auth.uid()
+      and (target_profile is null or fp.id = target_profile)
+  ),
+  totals as (
+    select
+      coalesce(sum(opening_balance), 0) as opening_balance,
+      coalesce(sum(receita), 0) as receita,
+      coalesce(sum(despesa), 0) as despesa,
+      coalesce(sum(aportes), 0) as aportes,
+      coalesce(sum(tx_count), 0)::bigint as tx_count
+    from per_profile
+  )
+  select
+    p.month_start,
+    o.opening_balance,
+    o.receita,
+    o.despesa,
+    o.receita - o.despesa,
+    o.aportes,
+    o.opening_balance + o.receita - o.despesa,
+    o.opening_balance + o.receita - o.despesa - o.aportes,
+    o.tx_count
+  from params p
+  cross join totals o;
+$$;
+
+revoke all on function public.get_monthly_financial_summary(int, int, uuid) from public;
+revoke all on function public.get_monthly_financial_summary(int, int, uuid) from anon;
+grant execute on function public.get_monthly_financial_summary(int, int, uuid) to authenticated;
+
+-- Assinatura usada pelo app hoje: passa a ser o consolidado (idêntico ao
+-- comportamento anterior enquanto todo usuário só tem o perfil PF).
+create or replace function public.get_monthly_financial_summary(
+  target_year int,
+  target_month int
+)
+returns table (
+  month date,
+  saldo_inicial numeric,
+  total_receita numeric,
+  total_despesa numeric,
+  resultado_operacional numeric,
+  total_aportes numeric,
+  disponivel_antes_aportes numeric,
+  saldo_final numeric,
+  transactions_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select * from public.get_monthly_financial_summary(target_year, target_month, null::uuid);
+$$;
