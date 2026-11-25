@@ -12,10 +12,50 @@ export type ImportStatus = 'pending' | 'processed' | 'failed';
 export type CategoryGroup = 'necessidades' | 'construcao' | 'estilo' | 'livre';
 export type PlanningRecurrence = 'none' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 export type ExpenseNature = 'fixa' | 'variavel';
+export type ProfileKind = 'pf' | 'pj';
 
 export type Database = {
   public: {
     Tables: {
+      financial_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: ProfileKind;
+          name: string;
+          document: string | null;
+          color: string;
+          archived: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          kind: ProfileKind;
+          name: string;
+          document?: string | null;
+          color?: string;
+          archived?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: ProfileKind;
+          name?: string;
+          document?: string | null;
+          color?: string;
+          archived?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -50,6 +90,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          profile_id: string;
           name: string;
           kind: TransactionKind;
           color: string;
@@ -69,6 +110,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          profile_id?: string;
           name: string;
           kind: TransactionKind;
           color?: string;
@@ -88,6 +130,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          profile_id?: string;
           name?: string;
           kind?: TransactionKind;
           color?: string;
@@ -172,6 +215,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          profile_id: string;
           occurred_on: string;
           amount: number;
           kind: TransactionKind;
@@ -188,6 +232,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          profile_id?: string;
           occurred_on: string;
           amount: number;
           kind: TransactionKind;
@@ -204,6 +249,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          profile_id?: string;
           occurred_on?: string;
           amount?: number;
           kind?: TransactionKind;
@@ -252,6 +298,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          profile_id: string;
           category_id: string;
           year: number;
           month: number;
@@ -262,6 +309,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          profile_id?: string;
           category_id: string;
           year: number;
           month: number;
@@ -272,6 +320,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          profile_id?: string;
           category_id?: string;
           year?: number;
           month?: number;
@@ -335,6 +384,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          profile_id: string;
           year: number;
           month: number;
           opening_balance: number;
@@ -344,6 +394,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          profile_id?: string;
           year: number;
           month: number;
           opening_balance?: number;
@@ -353,6 +404,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          profile_id?: string;
           year?: number;
           month?: number;
           opening_balance?: number;
@@ -365,6 +417,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
+          profile_id: string;
           source: ImportSource;
           filename: string | null;
           status: ImportStatus;
@@ -376,6 +429,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          profile_id?: string;
           source: ImportSource;
           filename?: string | null;
           status?: ImportStatus;
@@ -387,6 +441,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
+          profile_id?: string;
           source?: ImportSource;
           filename?: string | null;
           status?: ImportStatus;
@@ -444,7 +499,7 @@ export type Database = {
         Returns: undefined;
       };
       get_monthly_financial_summary: {
-        Args: { target_year: number; target_month: number };
+        Args: { target_year: number; target_month: number; target_profile?: string | null };
         Returns: {
           month: string;
           saldo_inicial: number;
@@ -463,6 +518,7 @@ export type Database = {
       import_source: ImportSource;
       import_status: ImportStatus;
       category_group: CategoryGroup;
+      profile_kind: ProfileKind;
     };
     CompositeTypes: Record<never, never>;
   };
@@ -476,3 +532,4 @@ export type Budget = Database['public']['Tables']['budgets']['Row'];
 export type Reserve = Database['public']['Tables']['reserves']['Row'];
 export type MonthlyBalance = Database['public']['Tables']['monthly_balances']['Row'];
 export type Import = Database['public']['Tables']['imports']['Row'];
+export type FinancialProfile = Database['public']['Tables']['financial_profiles']['Row'];

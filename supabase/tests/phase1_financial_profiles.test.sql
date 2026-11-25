@@ -196,4 +196,42 @@ begin
   if r.saldo_inicial <> 800 then raise exception 't09_abril_herda_saldo: %', r; end if;
 end $$;
 
+-- t12_app_logado: caminho real do app — usuário logado (RLS ativo) roda o
+-- template do signup e grava um lançamento sem profile_id; tudo cai no PF.
+insert into auth.users (id, instance_id, aud, role, email) values
+  ('aaaaaaaa-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pf-test-d@example.invalid');
+select set_config('request.jwt.claims',
+  json_build_object('sub', 'aaaaaaaa-0000-0000-0000-000000000004', 'role', 'authenticated')::text, true);
+set local role authenticated;
+select public.seed_default_categories('aaaaaaaa-0000-0000-0000-000000000004');
+insert into public.transactions (user_id, occurred_on, amount, kind, description)
+  values ('aaaaaaaa-0000-0000-0000-000000000004', '2026-02-01', 42, 'despesa', 'café logado');
+reset role;
+do $$ declare d constant uuid := 'aaaaaaaa-0000-0000-0000-000000000004'; begin
+  if (select count(*) from public.categories where user_id = d) = 0
+  then raise exception 't12_app_logado: template não criou categorias'; end if;
+  if exists (select 1 from public.categories where user_id = d and profile_id is distinct from public.pf_profile_id(d))
+     or exists (select 1 from public.transactions where user_id = d and profile_id is distinct from public.pf_profile_id(d))
+  then raise exception 't12_app_logado: dados fora do PF'; end if;
+end $$;
+
+-- t13_pf_criado_na_hora: usuário que ficou sem PF (ex.: cadastro durante a
+-- migração) consegue gravar; o PF é criado na primeira gravação.
+alter table public.financial_profiles disable trigger trg_protect_pf_profile;
+delete from public.transactions where user_id = 'aaaaaaaa-0000-0000-0000-000000000004';
+delete from public.categories where user_id = 'aaaaaaaa-0000-0000-0000-000000000004';
+delete from public.financial_profiles where user_id = 'aaaaaaaa-0000-0000-0000-000000000004';
+alter table public.financial_profiles enable trigger trg_protect_pf_profile;
+select set_config('request.jwt.claims',
+  json_build_object('sub', 'aaaaaaaa-0000-0000-0000-000000000004', 'role', 'authenticated')::text, true);
+set local role authenticated;
+insert into public.imports (user_id, source, filename)
+  values ('aaaaaaaa-0000-0000-0000-000000000004', 'csv', 'depois.csv');
+reset role;
+do $$ declare d constant uuid := 'aaaaaaaa-0000-0000-0000-000000000004'; begin
+  if public.pf_profile_id(d) is null
+     or (select profile_id from public.imports where user_id = d and filename = 'depois.csv') is distinct from public.pf_profile_id(d)
+  then raise exception 't13_pf_criado_na_hora'; end if;
+end $$;
+
 select 'ALL PASSED' as result;

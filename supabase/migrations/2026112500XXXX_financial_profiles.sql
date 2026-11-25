@@ -84,6 +84,48 @@ $$;
 
 revoke execute on function public.ensure_pf_profiles() from public, anon, authenticated;
 
+-- Garante o PF de UM usuário e devolve o id. Usado pelo preenchimento
+-- automático: quem ficou sem PF (ex.: cadastro durante esta migration) ganha
+-- o perfil na primeira gravação em vez de ficar travado. Só cria para o
+-- próprio usuário logado (ou em contexto sem login, como migrations).
+create or replace function public.ensure_pf_profile(target_user uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  select fp.id into v_id from public.financial_profiles fp
+  where fp.user_id = target_user and fp.kind = 'pf';
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  if auth.uid() is not null and auth.uid() <> target_user then
+    return null;
+  end if;
+
+  insert into public.financial_profiles (user_id, kind, name)
+  select
+    u.id,
+    'pf',
+    coalesce(nullif(trim(p.full_name), ''), nullif(split_part(u.email, '@', 1), ''), 'Você')
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  where u.id = target_user
+  on conflict (user_id) where kind = 'pf' do nothing;
+
+  select fp.id into v_id from public.financial_profiles fp
+  where fp.user_id = target_user and fp.kind = 'pf';
+  return v_id;
+end;
+$$;
+
+revoke execute on function public.ensure_pf_profile(uuid) from public, anon;
+grant execute on function public.ensure_pf_profile(uuid) to authenticated;
+
 select public.ensure_pf_profiles();
 
 -- 3) profile_id nas tabelas de dados + backfill --------------------------------
@@ -160,7 +202,7 @@ begin
   end if;
 
   if new.profile_id is null then
-    new.profile_id := public.pf_profile_id(new.user_id);
+    new.profile_id := public.ensure_pf_profile(new.user_id);
   end if;
 
   return new;
@@ -574,3 +616,6 @@ set search_path = public
 as $$
   select * from public.get_monthly_financial_summary(target_year, target_month, null::uuid);
 $$;
+
+-- 9) Última garantia: PF para quem se cadastrou enquanto esta migration rodava.
+select public.ensure_pf_profiles();
