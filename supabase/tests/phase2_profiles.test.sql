@@ -117,4 +117,45 @@ do $$ begin
   then raise exception 't2_08_nome_pf'; end if;
 end $$;
 
+-- t2_10_template_pf_nao_mexe_na_empresa: rodar o template da PF de novo
+-- não renomeia categorias da empresa nem pendura subcategorias nela.
+do $$ declare a constant uuid := 'bbbbbbbb-0000-0000-0000-000000000001'; v_pj uuid; begin
+  select id into v_pj from public.financial_profiles where user_id = a and kind = 'pj' and name = 'Bia LTDA';
+  insert into public.categories (user_id, profile_id, name, kind) values
+    (a, v_pj, 'Alimentação', 'despesa'), (a, v_pj, 'Outros', 'receita');
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.seed_default_categories(a);
+  if not exists (select 1 from public.categories where profile_id = v_pj and name = 'Outros' and kind = 'receita')
+  then raise exception 't2_10: renomeou categoria da empresa'; end if;
+  if exists (select 1 from public.subcategories s join public.categories c on c.id = s.category_id
+             where c.profile_id = v_pj and c.name = 'Alimentação')
+  then raise exception 't2_10: subcategorias da PF foram para a empresa'; end if;
+  if not exists (select 1 from public.subcategories s join public.categories c on c.id = s.category_id
+                 where c.profile_id = public.pf_profile_id(a) and c.name = 'Alimentação')
+  then raise exception 't2_10: PF ficou sem subcategorias de Alimentação'; end if;
+end $$;
+
+-- t2_11_empresa_de_outro_usuario: logado como B, não exclui nem aplica template na empresa de A
+select set_config('request.jwt.claims',
+  json_build_object('sub', 'bbbbbbbb-0000-0000-0000-000000000002', 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $$ declare v_pj uuid; begin
+  select id into v_pj from public.financial_profiles where name = 'Bia LTDA';
+  if v_pj is not null then raise exception 't2_11: B enxerga a empresa de A'; end if;
+end $$;
+reset role;
+do $$ declare v_pj uuid; begin
+  select id into v_pj from public.financial_profiles where name = 'Bia LTDA';
+  execute 'set local role authenticated';
+  begin
+    perform public.delete_company(v_pj);
+    raise exception 't2_11: B excluiu empresa de A';
+  exception when sqlstate '23514' then null; end;
+  begin
+    perform public.apply_pj_template(v_pj);
+    raise exception 't2_11: B aplicou template na empresa de A';
+  exception when sqlstate '23514' then null; end;
+  execute 'reset role';
+end $$;
+
 select 'ALL PASSED' as result;
