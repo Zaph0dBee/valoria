@@ -16,6 +16,8 @@ type Summary = {
   transf_recebidas?: number;
   transf_enviadas?: number;
   entradas_transferidas?: number;
+  pro_labore_pago?: number;
+  lucros_distribuidos?: number;
 };
 
 export function MonthSummary({
@@ -39,6 +41,14 @@ export function MonthSummary({
   const receita = Number(summary.total_receita ?? 0) + Number(summary.entradas_transferidas ?? 0);
   const transfIn = Number(summary.transf_recebidas ?? 0);
   const transfOut = Number(summary.transf_enviadas ?? 0);
+  const proLabore = Number(summary.pro_labore_pago ?? 0);
+  const lucros = Number(summary.lucros_distribuidos ?? 0);
+  // Transferências que ainda não aparecem em outra linha do card:
+  // recebidas fora de "entradas" (ex.: aporte de capital na empresa) e
+  // enviadas que não são pró-labore nem lucros (ex.: aporte de capital da PF).
+  const otherIn = Math.max(transfIn - Number(summary.entradas_transferidas ?? 0), 0);
+  const otherOut = Math.max(transfOut - proLabore - lucros, 0);
+  const hasTransfers = transfIn > 0 || transfOut > 0;
   const despesa = Number(summary.total_despesa ?? 0);
   const operational = Number(summary.resultado_operacional ?? 0);
   const aportes = Number(summary.total_aportes ?? 0);
@@ -70,7 +80,7 @@ export function MonthSummary({
               {formatMoney(finalBalance)}
             </span>
             <p className="mt-2 text-xs text-muted-foreground">
-              Saldo inicial + receitas − despesas − aportes.
+              Saldo inicial + receitas − despesas − aportes{hasTransfers ? ' ± transferências' : ''}.
             </p>
             {variation && (
               <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -102,21 +112,23 @@ export function MonthSummary({
             </div>
             <SummaryItem label="entradas" value={receita} tone="positive" />
             <SummaryItem label="saídas" value={despesa} tone="destructive" />
+            {proLabore > 0 && <SummaryItem label="pró-labore" value={proLabore} tone="destructive" />}
             <SummaryItem label="resultado" value={operational} tone={operational >= 0 ? 'positive' : 'destructive'} />
+            {lucros > 0 && <SummaryItem label="lucros distribuídos" value={lucros} tone="primary" />}
             <SummaryItem label="aportes" value={aportes} tone="primary" />
-            {(transfIn > 0 || transfOut > 0) && (
+            {(otherIn > 0 || otherOut > 0) && (
               <div data-testid="summary-transferencias">
-                <p className="eyebrow mb-1">transferências</p>
+                <p className="eyebrow mb-1">outras transferências</p>
                 <p className="text-sm num text-muted-foreground">
-                  {transfIn > 0 && <span className="block text-positive">+{formatMoney(transfIn)} recebidas</span>}
-                  {transfOut > 0 && <span className="block text-destructive">−{formatMoney(transfOut)} enviadas</span>}
+                  {otherIn > 0 && <span className="block text-positive">+{formatMoney(otherIn)} recebidas</span>}
+                  {otherOut > 0 && <span className="block text-destructive">−{formatMoney(otherOut)} enviadas</span>}
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {receita > 0 && (
+        {receita + otherIn > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="eyebrow">uso das entradas</p>
@@ -124,7 +136,7 @@ export function MonthSummary({
                 antes dos aportes: {formatMoney(Number(summary.disponivel_antes_aportes ?? 0))}
               </p>
             </div>
-            <StackedBar receita={receita} despesa={despesa} aportes={aportes} />
+            <StackedBar receita={receita + otherIn} despesa={despesa} aportes={aportes} retiradas={transfOut} />
           </div>
         )}
       </div>
@@ -160,26 +172,34 @@ function StackedBar({
   receita,
   despesa,
   aportes,
+  retiradas = 0,
 }: {
   receita: number;
   despesa: number;
   aportes: number;
+  /** Dinheiro que saiu para outros perfis (pró-labore, lucros, aporte de capital…). */
+  retiradas?: number;
 }) {
-  const total = Math.max(receita, despesa + aportes, 1);
+  const total = Math.max(receita, despesa + aportes + retiradas, 1);
   const despPct = (despesa / total) * 100;
   const aportePct = (aportes / total) * 100;
-  const restPct = Math.max(100 - despPct - aportePct, 0);
+  const retiradaPct = (retiradas / total) * 100;
+  const restPct = Math.max(100 - despPct - aportePct - retiradaPct, 0);
 
   return (
     <div>
       <div className="h-2.5 w-full rounded-full overflow-hidden bg-muted flex">
         <div className="bg-destructive/85" style={{ width: `${despPct}%` }} title={`Despesas: ${formatPercent(despPct, 1)}`} />
         <div className="bg-primary/85" style={{ width: `${aportePct}%` }} title={`Aportes: ${formatPercent(aportePct, 1)}`} />
+        {retiradas > 0 && (
+          <div className="bg-muted-foreground/60" style={{ width: `${retiradaPct}%` }} title={`Retiradas: ${formatPercent(retiradaPct, 1)}`} />
+        )}
         <div className="bg-positive/60" style={{ width: `${restPct}%` }} title={`Livre: ${formatPercent(restPct, 1)}`} />
       </div>
       <div className="flex flex-wrap gap-4 mt-3 text-xs text-muted-foreground">
         <LegendDot color="bg-destructive/85" label={`Despesas ${formatPercent(despPct, 0)}`} />
         <LegendDot color="bg-primary/85" label={`Aportes ${formatPercent(aportePct, 0)}`} />
+        {retiradas > 0 && <LegendDot color="bg-muted-foreground/60" label={`Retiradas ${formatPercent(retiradaPct, 0)}`} />}
         <LegendDot color="bg-positive/60" label={`Livre ${formatPercent(restPct, 0)}`} />
       </div>
     </div>

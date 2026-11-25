@@ -196,9 +196,13 @@ test('pró-labore aparece na PF e não duplica no consolidado', async ({ page })
 
   await page.goto('/dashboard?y=2026&m=1');
   await expect(page.getByTestId('summary-resultado')).toContainText('R$ 7.000,00');
+  // O card da empresa fecha a conta: entradas − saídas − pró-labore = resultado.
+  await expect(page.getByTestId('summary-pró-labore')).toContainText('R$ 3.000,00');
 
   await switchProfile(page, 'Você (PF)');
   await expect(page.getByTestId('summary-entradas')).toContainText('R$ 3.000,00');
+  // O pró-labore recebido já está em "entradas": não aparece de novo como transferência.
+  await expect(page.getByTestId('summary-transferencias')).toHaveCount(0);
 
   await switchProfile(page, 'Consolidado');
   await expect(page.getByTestId('summary-entradas')).toContainText('R$ 10.000,00');
