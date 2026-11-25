@@ -22,6 +22,8 @@ import { formatDate, formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ProfileKind, TransactionKind } from '@/types/database';
 import { profileLabel } from '@/lib/profile-selection';
+import { TRANSFER_REASON_LABELS } from '@/lib/transfers';
+import type { TransferReason } from '@/types/database';
 
 type Cat = { id: string; profile_id: string; name: string; kind: TransactionKind; color: string };
 type ProfileOption = { id: string; kind: ProfileKind; name: string; color: string };
@@ -73,7 +75,8 @@ export function ImportClient({
       setErrors([`O arquivo contém ${parsed.rows.length} lançamentos. O limite por importação é ${MAX_IMPORT_ROWS}.`]);
       return;
     }
-    setRows(parsed.rows);
+    // Guarda o sinal original: define origem/destino se a linha virar transferência.
+    setRows(parsed.rows.map((r) => ({ ...r, direction: r.kind === 'receita' ? 'in' : 'out' })));
     setErrors(parsed.errors);
 
     if (parsed.rows.length > 0) {
@@ -86,8 +89,26 @@ export function ImportClient({
   }
 
   function updateKind(index: number, kind: TransactionKind) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, kind, category_id: null } : r)));
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              kind,
+              category_id: null,
+              transfer_profile_id: kind === 'transferencia' ? r.transfer_profile_id ?? null : null,
+              transfer_reason: kind === 'transferencia' ? r.transfer_reason ?? null : null,
+            }
+          : r,
+      ),
+    );
   }
+
+  function updateTransfer(index: number, patch: { transfer_profile_id?: string; transfer_reason?: TransferReason }) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  const otherProfiles = profiles.filter((p) => p.id !== profileId);
 
   function removeRow(index: number) {
     setRows((prev) => prev.filter((_, i) => i !== index));
@@ -239,17 +260,54 @@ export function ImportClient({
                     <TableCell className="text-sm">{r.description}</TableCell>
                     <TableCell>
                       <Select value={r.kind} onValueChange={(v) => updateKind(i, v as TransactionKind)}>
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 text-xs" aria-label={`Tipo: ${r.description}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="receita">Receita</SelectItem>
                           <SelectItem value="despesa">Despesa</SelectItem>
                           {!isCompany && <SelectItem value="reserva">Aporte</SelectItem>}
+                          {showProfileField && otherProfiles.length > 0 && (
+                            <SelectItem value="transferencia">Transferência</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell>
+                      {r.kind === 'transferencia' ? (
+                        <div className="flex flex-col gap-1">
+                          <Select
+                            value={r.transfer_profile_id ?? ''}
+                            onValueChange={(v) => updateTransfer(i, { transfer_profile_id: v })}
+                          >
+                            <SelectTrigger className="h-8 text-xs" aria-label={`Outro perfil: ${r.description}`}>
+                              <SelectValue placeholder={r.direction === 'in' ? 'Veio de…' : 'Foi para…'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {otherProfiles.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {profileLabel(p)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={r.transfer_reason ?? ''}
+                            onValueChange={(v) => updateTransfer(i, { transfer_reason: v as TransferReason })}
+                          >
+                            <SelectTrigger className="h-8 text-xs" aria-label={`Motivo: ${r.description}`}>
+                              <SelectValue placeholder="Motivo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(TRANSFER_REASON_LABELS) as TransferReason[]).map((reason) => (
+                                <SelectItem key={reason} value={reason}>
+                                  {reason === 'outro' ? 'Outro' : TRANSFER_REASON_LABELS[reason]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
                       <Select
                         value={r.category_id ?? ''}
                         onValueChange={(v) => updateCategory(i, v || null)}
@@ -267,6 +325,7 @@ export function ImportClient({
                             ))}
                         </SelectContent>
                       </Select>
+                      )}
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -274,9 +333,12 @@ export function ImportClient({
                         r.kind === 'receita' && 'text-positive',
                         r.kind === 'despesa' && 'text-destructive',
                         r.kind === 'reserva' && 'text-primary',
+                        r.kind === 'transferencia' && (r.direction === 'in' ? 'text-positive' : 'text-destructive'),
                       )}
                     >
-                      {r.kind === 'despesa' || r.kind === 'reserva' ? '−' : '+'}
+                      {r.kind === 'transferencia'
+                        ? r.direction === 'in' ? '+' : '−'
+                        : r.kind === 'despesa' || r.kind === 'reserva' ? '−' : '+'}
                       {formatMoney(r.amount)}
                     </TableCell>
                     <TableCell>

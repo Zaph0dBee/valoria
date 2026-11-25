@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import type { TransactionKind } from '@/types/database';
+import type { TransactionKind, TransferReason } from '@/types/database';
 import { splitDuplicates, type DedupeRow } from '@/lib/import-dedupe';
+import { matchExistingTransfers, resolveTransferRow } from '@/lib/transfers';
 
 export type ParsedRow = {
   occurred_on: string;
@@ -12,14 +13,22 @@ export type ParsedRow = {
   kind: TransactionKind;
   description: string;
   category_id?: string | null;
+  /** Sinal original no extrato: entrada ("in") ou saída ("out"). */
+  direction?: 'in' | 'out';
+  /** Para transferências: o OUTRO perfil (origem se entrada, destino se saída). */
+  transfer_profile_id?: string | null;
+  transfer_reason?: TransferReason | null;
 };
 
 const ParsedRowSchema = z.object({
   occurred_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount: z.coerce.number().finite().positive(),
-  kind: z.enum(['receita', 'despesa', 'reserva']),
+  kind: z.enum(['receita', 'despesa', 'reserva', 'transferencia']),
   description: z.string().trim().min(1).max(200),
   category_id: z.string().uuid().nullable().optional(),
+  direction: z.enum(['in', 'out']).optional(),
+  transfer_profile_id: z.string().uuid().nullable().optional(),
+  transfer_reason: z.enum(['pro_labore', 'lucros', 'aporte_capital', 'outro']).nullable().optional(),
 });
 
 const ImportSchema = z.object({
@@ -86,8 +95,81 @@ export async function importTransactions(input: {
     }
   }
 
+  // Transferências: resolve origem/destino, valida e separa as já registradas
+  // (a mesma transferência pode vir no extrato da empresa e no da PF).
+  const transferRows = parsed.data.rows.filter((row) => row.kind === 'transferencia');
+  const plainRows = parsed.data.rows.filter((row) => row.kind !== 'transferencia');
+  type ResolvedTransfer = {
+    occurred_on: string;
+    amount: number;
+    description: string;
+    profile_id: string;
+    counterpart_profile_id: string;
+    transfer_reason: TransferReason;
+  };
+  const resolvedTransfers: ResolvedTransfer[] = [];
+  if (transferRows.length) {
+    const { data: ownProfiles, error: ownError } = await supabase
+      .from('financial_profiles')
+      .select('id, kind, archived')
+      .eq('user_id', user.id);
+    if (ownError) return { error: ownError.message };
+    const byId = new Map((ownProfiles ?? []).map((p) => [p.id, p]));
+    for (const row of transferRows) {
+      if (!row.transfer_profile_id || !row.transfer_reason || !row.direction) {
+        return { error: `Escolha o outro perfil e o motivo da transferência "${row.description}"` };
+      }
+      if (row.category_id) return { error: 'Transferência não tem categoria' };
+      const ends = resolveTransferRow(
+        { direction: row.direction, transfer_profile_id: row.transfer_profile_id },
+        parsed.data.profile_id,
+      );
+      const origin = byId.get(ends.profile_id);
+      const target = byId.get(ends.counterpart_profile_id);
+      if (!origin || !target || origin.id === target.id) {
+        return { error: `Perfis inválidos na transferência "${row.description}"` };
+      }
+      if (origin.archived || target.archived) return { error: 'Um dos perfis da transferência está arquivado' };
+      if ((row.transfer_reason === 'pro_labore' || row.transfer_reason === 'lucros') && !(origin.kind === 'pj' && target.kind === 'pf')) {
+        return { error: `"${row.description}": pró-labore e lucros vão da empresa para a PF` };
+      }
+      if (row.transfer_reason === 'aporte_capital' && !(origin.kind === 'pf' && target.kind === 'pj')) {
+        return { error: `"${row.description}": aporte de capital vai da PF para a empresa` };
+      }
+      resolvedTransfers.push({
+        occurred_on: row.occurred_on,
+        amount: row.amount,
+        description: row.description,
+        profile_id: ends.profile_id,
+        counterpart_profile_id: ends.counterpart_profile_id,
+        transfer_reason: row.transfer_reason,
+      });
+    }
+  }
+
+  let freshTransfers: ResolvedTransfer[] = [];
+  let alreadyTransfers: ResolvedTransfer[] = [];
+  if (resolvedTransfers.length) {
+    const tDates = resolvedTransfers.map((t) => t.occurred_on).sort();
+    const shift = (iso: string, days: number) =>
+      new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+    const involved = [...new Set(resolvedTransfers.flatMap((t) => [t.profile_id, t.counterpart_profile_id]))];
+    const { data: existingTransfers, error: existingError } = await supabase
+      .from('transactions')
+      .select('occurred_on, amount, description, profile_id, counterpart_profile_id, transfer_reason')
+      .eq('user_id', user.id)
+      .eq('kind', 'transferencia')
+      .in('profile_id', involved)
+      .gte('occurred_on', shift(tDates[0], -3))
+      .lte('occurred_on', shift(tDates[tDates.length - 1], 3));
+    if (existingError) return { error: existingError.message };
+    const split = matchExistingTransfers(resolvedTransfers, (existingTransfers ?? []) as ResolvedTransfer[]);
+    freshTransfers = split.fresh;
+    alreadyTransfers = split.already;
+  }
+
   // Evita duplicar lançamentos ao importar o mesmo extrato (ou extratos que se sobrepõem).
-  const dates = parsed.data.rows.map((row) => row.occurred_on).sort();
+  const dates = (plainRows.length ? plainRows : parsed.data.rows).map((row) => row.occurred_on).sort();
   const existing: DedupeRow[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -105,9 +187,10 @@ export async function importTransactions(input: {
     if (!data || data.length < PAGE) break;
   }
 
-  const { fresh, duplicates } = splitDuplicates(parsed.data.rows, existing);
-  if (fresh.length === 0) {
-    return { ok: true, count: 0, skipped: duplicates.length };
+  const { fresh, duplicates } = splitDuplicates(plainRows, existing);
+  const skipped = duplicates.length + alreadyTransfers.length;
+  if (fresh.length === 0 && freshTransfers.length === 0) {
+    return { ok: true, count: 0, skipped };
   }
 
   const { data: imp, error: impErr } = await supabase
@@ -124,17 +207,34 @@ export async function importTransactions(input: {
 
   if (impErr || !imp) return { error: impErr?.message ?? 'Erro criando importação' };
 
-  const inserts = fresh.map((row) => ({
-    user_id: user.id,
-    profile_id: parsed.data.profile_id,
-    occurred_on: row.occurred_on,
-    amount: row.amount,
-    kind: row.kind,
-    description: row.description,
-    category_id: row.category_id ?? null,
-    source: parsed.data.source,
-    import_id: imp.id,
-  }));
+  const inserts = [
+    ...fresh.map((row) => ({
+      user_id: user.id,
+      profile_id: parsed.data.profile_id,
+      occurred_on: row.occurred_on,
+      amount: row.amount,
+      kind: row.kind,
+      description: row.description,
+      category_id: row.category_id ?? null,
+      counterpart_profile_id: null as string | null,
+      transfer_reason: null as TransferReason | null,
+      source: parsed.data.source,
+      import_id: imp.id,
+    })),
+    ...freshTransfers.map((t) => ({
+      user_id: user.id,
+      profile_id: t.profile_id,
+      occurred_on: t.occurred_on,
+      amount: t.amount,
+      kind: 'transferencia' as const,
+      description: t.description,
+      category_id: null,
+      counterpart_profile_id: t.counterpart_profile_id,
+      transfer_reason: t.transfer_reason,
+      source: parsed.data.source,
+      import_id: imp.id,
+    })),
+  ];
 
   const { error: txErr } = await supabase.from('transactions').insert(inserts);
 
@@ -162,5 +262,5 @@ export async function importTransactions(input: {
   revalidatePath('/dashboard');
   revalidatePath('/transacoes');
   revalidatePath('/importar');
-  return { ok: true, count: inserts.length, skipped: duplicates.length };
+  return { ok: true, count: inserts.length, skipped };
 }

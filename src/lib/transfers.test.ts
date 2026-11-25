@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRANSFER_REASON_LABELS, transferView } from './transfers';
+import { TRANSFER_REASON_LABELS, matchExistingTransfers, resolveTransferRow, transferView } from './transfers';
 
 const names = { pf: 'Você (PF)', loja: 'Loja' };
 const proLabore = {
@@ -40,5 +40,51 @@ describe('TRANSFER_REASON_LABELS', () => {
       aporte_capital: 'Aporte de capital',
       outro: 'Transferência',
     });
+  });
+});
+
+describe('resolveTransferRow', () => {
+  it('saída no extrato: origem é o perfil do import', () => {
+    expect(resolveTransferRow({ direction: 'out', transfer_profile_id: 'pf' }, 'loja')).toEqual({
+      profile_id: 'loja',
+      counterpart_profile_id: 'pf',
+    });
+  });
+
+  it('entrada no extrato: origem é o outro perfil', () => {
+    expect(resolveTransferRow({ direction: 'in', transfer_profile_id: 'loja' }, 'pf')).toEqual({
+      profile_id: 'loja',
+      counterpart_profile_id: 'pf',
+    });
+  });
+});
+
+describe('matchExistingTransfers', () => {
+  const t = (occurred_on: string, amount = 3000, profile_id = 'loja', counterpart_profile_id = 'pf') => ({
+    occurred_on, amount, profile_id, counterpart_profile_id,
+  });
+
+  it('mesma transferência 2 dias depois no outro extrato → já registrada', () => {
+    const row = t('2026-01-07');
+    expect(matchExistingTransfers([row], [t('2026-01-05')])).toEqual({ fresh: [], already: [row] });
+  });
+
+  it('4 dias de diferença → nova', () => {
+    const row = t('2026-01-09');
+    expect(matchExistingTransfers([row], [t('2026-01-05')]).fresh).toEqual([row]);
+  });
+
+  it('valor diferente → nova', () => {
+    expect(matchExistingTransfers([t('2026-01-05', 3000.01)], [t('2026-01-05')]).fresh).toHaveLength(1);
+  });
+
+  it('par invertido → nova', () => {
+    expect(matchExistingTransfers([t('2026-01-05', 3000, 'pf', 'loja')], [t('2026-01-05')]).fresh).toHaveLength(1);
+  });
+
+  it('cada existente casa no máximo uma linha', () => {
+    const result = matchExistingTransfers([t('2026-01-05'), t('2026-01-06')], [t('2026-01-05')]);
+    expect(result.already).toHaveLength(1);
+    expect(result.fresh).toHaveLength(1);
   });
 });

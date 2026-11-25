@@ -232,3 +232,34 @@ test('apagar transferência some dos dois perfis', async ({ page }) => {
   await switchProfile(page, 'Você (PF)');
   await expect(page.getByRole('row', { name: new RegExp(description) })).toHaveCount(0);
 });
+
+test('mesma transferência nos dois extratos não duplica', async ({ page }) => {
+  const out = `Prolabore saida ${RUN_ID}`;
+  const incoming = `Prolabore entrada ${RUN_ID}`;
+  const importTransfer = async (profile: string, other: string, line: string, description: string) => {
+    await page.goto('/importar');
+    await switchProfile(page, profile);
+    await page.locator('input[type=file]').setInputFiles({
+      name: `transf-${RUN_ID}.csv`,
+      mimeType: 'text/csv',
+      buffer: Buffer.from(`Data;Descrição;Valor\n${line}\n`, 'latin1'),
+    });
+    await page.getByRole('combobox', { name: `Tipo: ${description}` }).click();
+    await page.getByRole('option', { name: 'Transferência' }).click();
+    await page.getByRole('combobox', { name: `Outro perfil: ${description}` }).click();
+    await page.getByRole('option', { name: other }).click();
+    await page.getByRole('combobox', { name: `Motivo: ${description}` }).click();
+    await page.getByRole('option', { name: 'Pró-labore' }).click();
+    await page.getByRole('button', { name: 'Importar 1' }).click();
+  };
+
+  await importTransfer(COMPANY, 'Você (PF)', `05/01/2026;${out};-3.000,00`, out);
+  await expect(page.getByText('1 lançamentos importados', { exact: true })).toBeVisible();
+
+  await importTransfer('Você (PF)', COMPANY, `07/01/2026;${incoming};3.000,00`, incoming);
+  await expect(page.getByText('Nada novo para importar', { exact: true })).toBeVisible();
+
+  await page.goto('/transacoes');
+  await expect(page.getByRole('row', { name: new RegExp(out) })).toContainText('+R$ 3.000,00');
+  await expect(page.getByRole('row', { name: new RegExp(incoming) })).toHaveCount(0);
+});
