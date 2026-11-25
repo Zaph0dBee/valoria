@@ -29,7 +29,16 @@ end $$;
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pf-test-a@example.invalid', '{"full_name":"Ana Teste"}'),
   ('aaaaaaaa-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pf-test-b@example.invalid', '{}');
-select public.ensure_pf_profiles(); -- temporário: removido na Task 2 (signup passa a criar o PF)
+
+-- t02_signup_cria_pf: o cadastro cria o PF (nome do full_name, senão do e-mail)
+do $$ begin
+  if (select name from public.financial_profiles
+      where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and kind = 'pf') is distinct from 'Ana Teste'
+  then raise exception 't02_signup_cria_pf: nome do full_name'; end if;
+  if (select name from public.financial_profiles
+      where user_id = 'aaaaaaaa-0000-0000-0000-000000000002' and kind = 'pf') is distinct from 'pf-test-b'
+  then raise exception 't02_signup_cria_pf: nome do e-mail'; end if;
+end $$;
 
 -- t03_default_fill_*: insert sem profile_id cai no PF do dono
 do $$ declare v_cat uuid; v_tx uuid; begin
@@ -59,6 +68,95 @@ do $$ begin
   if (select count(*) from public.monthly_balances where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') <> 1
      or (select profile_id from public.monthly_balances where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') is null
   then raise exception 't04_upsert_monthly_balance'; end if;
+end $$;
+
+-- t05_um_pf_por_usuario
+do $$ begin
+  begin
+    insert into public.financial_profiles (user_id, kind, name)
+      values ('aaaaaaaa-0000-0000-0000-000000000001', 'pf', 'Outro PF');
+    raise exception 't05_um_pf_por_usuario: aceitou segundo PF';
+  exception when unique_violation then null; end;
+end $$;
+
+-- t06_*: perfil de outro usuário, categoria de outro perfil, mover categoria
+do $$ declare v_pj uuid; v_cat_pf uuid; begin
+  insert into public.financial_profiles (user_id, kind, name)
+    values ('aaaaaaaa-0000-0000-0000-000000000001', 'pj', 'Empresa Teste') returning id into v_pj;
+  select id into v_cat_pf from public.categories
+    where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and name = 'Teste Cat';
+  begin
+    insert into public.transactions (user_id, profile_id, occurred_on, amount, kind, description)
+      values ('aaaaaaaa-0000-0000-0000-000000000002', v_pj, '2026-01-10', 1, 'despesa', 'x');
+    raise exception 't06_perfil_de_outro_usuario: aceitou';
+  exception when sqlstate '23514' then null; end;
+  begin
+    insert into public.transactions (user_id, profile_id, occurred_on, amount, kind, description, category_id)
+      values ('aaaaaaaa-0000-0000-0000-000000000001', v_pj, '2026-01-10', 1, 'despesa', 'x', v_cat_pf);
+    raise exception 't06_categoria_de_outro_perfil: aceitou';
+  exception when sqlstate '23514' then null; end;
+  begin
+    update public.categories set profile_id = v_pj where id = v_cat_pf;
+    raise exception 't06_mover_categoria: aceitou';
+  exception when sqlstate '23514' then null; end;
+end $$;
+
+-- t07_protege_pf
+do $$ declare v_pf uuid := public.pf_profile_id('aaaaaaaa-0000-0000-0000-000000000002'); begin
+  begin
+    update public.financial_profiles set archived = true where id = v_pf;
+    raise exception 't07_arquivar_pf: aceitou';
+  exception when sqlstate '23514' then null; end;
+  begin
+    delete from public.financial_profiles where id = v_pf;
+    raise exception 't07_apagar_pf: aceitou';
+  exception when sqlstate '23514' then null; end;
+end $$;
+
+-- t08_rls: usuário B não vê perfis de A (pulado se não puder trocar de role)
+do $$ begin
+  begin
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', 'aaaaaaaa-0000-0000-0000-000000000002', 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    if exists (select 1 from public.financial_profiles where user_id = 'aaaaaaaa-0000-0000-0000-000000000001')
+    then raise exception 't08_rls: B enxerga perfis de A'; end if;
+    if not exists (select 1 from public.financial_profiles where user_id = 'aaaaaaaa-0000-0000-0000-000000000002')
+    then raise exception 't08_rls: B não enxerga o próprio PF'; end if;
+    execute 'reset role';
+  exception when insufficient_privilege then
+    raise notice 't08_rls: pulado (sem permissão para set role)';
+  end;
+end $$;
+
+-- t10_recorrencia_copia_perfil
+do $$ declare v_pj uuid; v_rule uuid; begin
+  select id into v_pj from public.financial_profiles
+    where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and kind = 'pj';
+  insert into public.recurring_transactions (user_id, profile_id, name, kind, amount, frequency, day_of_month, starts_on)
+    values ('aaaaaaaa-0000-0000-0000-000000000001', v_pj, 'Aluguel sala', 'despesa', 900, 'monthly', 5, '2026-01-01')
+    returning id into v_rule;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', 'aaaaaaaa-0000-0000-0000-000000000001', 'role', 'authenticated')::text, true);
+  perform public.generate_recurring_transactions(2026, 2, false);
+  if (select profile_id from public.transactions where recurring_rule_id = v_rule) is distinct from v_pj
+  then raise exception 't10_recorrencia_copia_perfil'; end if;
+end $$;
+
+-- t11_apagar_usuario: excluir a conta (cascata) continua funcionando com PF, PJ e dados
+insert into auth.users (id, instance_id, aud, role, email) values
+  ('aaaaaaaa-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pf-test-c@example.invalid');
+do $$ declare v_pj uuid; v_cat uuid; c constant uuid := 'aaaaaaaa-0000-0000-0000-000000000003'; begin
+  insert into public.financial_profiles (user_id, kind, name) values (c, 'pj', 'Empresa C') returning id into v_pj;
+  insert into public.categories (user_id, profile_id, name, kind) values (c, v_pj, 'Vendas', 'receita') returning id into v_cat;
+  insert into public.transactions (user_id, profile_id, occurred_on, amount, kind, description, category_id)
+    values (c, v_pj, '2026-01-10', 100, 'receita', 'venda', v_cat);
+  insert into public.transactions (user_id, occurred_on, amount, kind, description)
+    values (c, '2026-01-11', 5, 'despesa', 'café');
+  delete from auth.users where id = c;
+  if exists (select 1 from public.financial_profiles where user_id = c)
+     or exists (select 1 from public.transactions where user_id = c)
+  then raise exception 't11_apagar_usuario: dados ficaram'; end if;
 end $$;
 
 select 'ALL PASSED' as result;
