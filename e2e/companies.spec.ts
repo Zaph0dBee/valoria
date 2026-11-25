@@ -34,6 +34,9 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage({ storageState: 'e2e/.auth/user.json' });
+  // Lançamentos da empresa só aparecem nela ou no Consolidado: limpa a partir do Consolidado.
+  await page.goto('/transacoes');
+  await switchProfile(page, 'Consolidado').catch(() => undefined);
   await deleteTransactionsContaining(page, RUN_ID);
   await switchProfile(page, 'Você (PF)').catch(() => undefined);
   await deleteCompanyByName(page, COMPANY);
@@ -70,5 +73,46 @@ test('categorias por perfil', async ({ page }) => {
 
   await switchProfile(page, 'Consolidado');
   await expect(page.getByText('Escolha um perfil para ver e editar categorias.')).toBeVisible();
+  await switchProfile(page, 'Você (PF)');
+});
+
+test('lançamento na empresa não aparece na PF', async ({ page }) => {
+  const description = `Despesa ${RUN_ID}`;
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await page.goto('/transacoes?new=1&kind=despesa');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Valor (R$)').fill('100,00');
+  await dialog.getByLabel('Descrição').fill(description);
+  await dialog.getByRole('combobox', { name: 'Categoria', exact: true }).click();
+  await page.getByRole('option', { name: 'Marketing' }).click();
+  await dialog.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByText('Lançamento criado', { exact: true })).toBeVisible();
+  await expect(page.getByRole('row', { name: new RegExp(description) })).toBeVisible();
+
+  await switchProfile(page, 'Você (PF)');
+  await expect(page.getByRole('row', { name: new RegExp(description) })).toHaveCount(0);
+
+  await switchProfile(page, 'Consolidado');
+  const row = page.getByRole('row', { name: new RegExp(description) });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText(COMPANY);
+  await switchProfile(page, 'Você (PF)');
+});
+
+test('consolidado pede perfil', async ({ page }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, 'Consolidado');
+  await page.getByRole('button', { name: 'Novo lançamento' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox', { name: 'Perfil' }).click();
+  await page.getByRole('option', { name: COMPANY }).click();
+  await expect(dialog.getByRole('button', { name: 'Aporte' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Despesa' }).click();
+  await dialog.getByRole('combobox', { name: 'Categoria', exact: true }).click();
+  await expect(page.getByRole('option', { name: 'Marketing' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Casa', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
   await switchProfile(page, 'Você (PF)');
 });

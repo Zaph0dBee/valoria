@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { TransactionsClient } from './transactions-client';
 import type { TransactionKind } from '@/types/database';
+import { getProfileContext } from '@/lib/profile-context';
 
 const VALID_KINDS = new Set<TransactionKind>(['receita', 'despesa', 'reserva']);
 
@@ -12,14 +13,20 @@ export default async function TransacoesPage({
   const params = await searchParams;
   const supabase = await createClient();
 
+  const profileCtx = await getProfileContext();
+  const profileId = profileCtx.active.mode === 'profile' ? profileCtx.active.profileId : null;
+
+  let txQuery = supabase
+    .from('transactions')
+    .select('id, profile_id, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name), financial_profiles(name, color, kind)')
+    .order('occurred_on', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (profileId) txQuery = txQuery.eq('profile_id', profileId);
+
   const [txRes, catRes, subRes, reserveRes] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select('id, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name)')
-      .order('occurred_on', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(200),
-    supabase.from('categories').select('id, name, kind, color').eq('archived', false).order('sort_order'),
+    txQuery,
+    supabase.from('categories').select('id, profile_id, name, kind, color').eq('archived', false).order('sort_order'),
     supabase.from('subcategories').select('id, category_id, name').eq('archived', false).order('sort_order'),
     supabase.from('reserves').select('id, name').eq('archived', false).order('created_at'),
   ]);
@@ -46,6 +53,10 @@ export default async function TransacoesPage({
         openNewOnMount={params.new === '1'}
         initialKind={initialKind}
         initialReserveId={params.reserve}
+        profiles={profileCtx.activeProfiles.map(({ id, kind, name, color }) => ({ id, kind, name, color }))}
+        defaultProfileId={profileId ?? profileCtx.pf?.id ?? ''}
+        showProfileField={profileCtx.showSelector}
+        showProfileTag={profileId === null}
       />
     </div>
   );

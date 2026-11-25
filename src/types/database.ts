@@ -292,6 +292,13 @@ export type Database = {
             referencedRelation: 'reserves';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'transactions_profile_id_fkey';
+            columns: ['profile_id'];
+            isOneToOne: false;
+            referencedRelation: 'financial_profiles';
+            referencedColumns: ['id'];
+          },
         ];
       };
       budgets: {

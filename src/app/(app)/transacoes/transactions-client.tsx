@@ -26,11 +26,13 @@ import { useToast } from '@/components/ui/toaster';
 import { createTransaction, deleteTransaction, updateTransaction } from '@/actions/transactions';
 import { formatDate, formatMoney, todayISO } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { TransactionKind } from '@/types/database';
+import type { ProfileKind, TransactionKind } from '@/types/database';
+import { profileLabel } from '@/lib/profile-selection';
 import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 type Tx = {
   id: string;
+  profile_id: string;
   occurred_on: string;
   amount: number;
   kind: TransactionKind;
@@ -41,9 +43,11 @@ type Tx = {
   reserve_id: string | null;
   categories: { name: string; color: string } | null;
   reserves: { name: string } | null;
+  financial_profiles: { name: string; color: string; kind: ProfileKind } | null;
 };
 
-type Cat = { id: string; name: string; kind: TransactionKind; color: string };
+type Cat = { id: string; profile_id: string; name: string; kind: TransactionKind; color: string };
+type ProfileOption = { id: string; kind: ProfileKind; name: string; color: string };
 type Sub = { id: string; category_id: string; name: string };
 type ReserveOption = { id: string; name: string };
 
@@ -61,6 +65,10 @@ export function TransactionsClient({
   openNewOnMount,
   initialKind,
   initialReserveId,
+  profiles,
+  defaultProfileId,
+  showProfileField,
+  showProfileTag,
 }: {
   initialTransactions: Tx[];
   categories: Cat[];
@@ -69,6 +77,12 @@ export function TransactionsClient({
   openNewOnMount: boolean;
   initialKind?: TransactionKind;
   initialReserveId?: string;
+  profiles: ProfileOption[];
+  defaultProfileId: string;
+  /** Mostra o campo "Perfil" no formulário (só com 2+ perfis). */
+  showProfileField: boolean;
+  /** Mostra a etiqueta do perfil em cada lançamento (Consolidado). */
+  showProfileTag: boolean;
 }) {
   const [open, setOpen] = React.useState(openNewOnMount);
   const [editing, setEditing] = React.useState<Tx | null>(null);
@@ -147,10 +161,17 @@ export function TransactionsClient({
                       {' · '}
                       {tx.categories?.name ?? 'Sem categoria'}
                       {tx.kind === 'reserva' && tx.reserves ? ` · ${tx.reserves.name}` : ''}
+                      {showProfileTag && tx.financial_profiles ? ` · ${profileLabel(tx.financial_profiles)}` : ''}
                     </span>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <div className="flex flex-col gap-1">
+                      {showProfileTag && tx.financial_profiles && (
+                        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground">
+                          <span className="swatch h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tx.financial_profiles.color }} />
+                          {profileLabel(tx.financial_profiles)}
+                        </span>
+                      )}
                       {tx.categories ? (
                         <span className="inline-flex items-center gap-2 text-xs">
                           <span
@@ -220,6 +241,9 @@ export function TransactionsClient({
         editing={editing}
         initialKind={initialKind}
         initialReserveId={initialReserveId}
+        profiles={profiles}
+        defaultProfileId={defaultProfileId}
+        showProfileField={showProfileField}
       />
     </div>
   );
@@ -234,6 +258,9 @@ function TransactionDialog({
   editing,
   initialKind,
   initialReserveId,
+  profiles,
+  defaultProfileId,
+  showProfileField,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -243,6 +270,9 @@ function TransactionDialog({
   editing: Tx | null;
   initialKind?: TransactionKind;
   initialReserveId?: string;
+  profiles: ProfileOption[];
+  defaultProfileId: string;
+  showProfileField: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -251,6 +281,9 @@ function TransactionDialog({
   const [categoryId, setCategoryId] = React.useState<string>(editing?.category_id ?? '');
   const [subcategoryId, setSubcategoryId] = React.useState<string>(editing?.subcategory_id ?? '');
   const [reserveId, setReserveId] = React.useState<string>(editing?.reserve_id ?? initialReserveId ?? '');
+  const [profileId, setProfileId] = React.useState<string>(editing?.profile_id ?? defaultProfileId);
+  const selectedProfile = profiles.find((p) => p.id === profileId);
+  const isCompany = selectedProfile?.kind === 'pj';
 
   React.useEffect(() => {
     if (open) {
@@ -258,14 +291,17 @@ function TransactionDialog({
       const suggestedReserve = !editing && nextKind === 'reserva' && reserves.some((r) => r.id === initialReserveId)
         ? initialReserveId ?? ''
         : '';
-      setKind(nextKind);
+      const nextProfile = editing?.profile_id ?? defaultProfileId;
+      const nextProfileIsCompany = profiles.find((p) => p.id === nextProfile)?.kind === 'pj';
+      setProfileId(nextProfile);
+      setKind(nextProfileIsCompany && nextKind === 'reserva' ? 'despesa' : nextKind);
       setCategoryId(editing?.category_id ?? '');
       setSubcategoryId(editing?.subcategory_id ?? '');
       setReserveId(editing?.reserve_id ?? suggestedReserve);
     }
-  }, [open, editing, initialKind, initialReserveId, reserves]);
+  }, [open, editing, initialKind, initialReserveId, reserves, defaultProfileId, profiles]);
 
-  const filteredCategories = categories.filter((c) => c.kind === kind);
+  const filteredCategories = categories.filter((c) => c.kind === kind && c.profile_id === profileId);
   const filteredSubs = subcategories.filter((s) => s.category_id === categoryId);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -273,6 +309,7 @@ function TransactionDialog({
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     const payload = {
+      profile_id: profileId,
       occurred_on: fd.get('occurred_on') as string,
       amount: parseMoney(fd.get('amount')) ?? Number.NaN,
       kind,
@@ -311,6 +348,38 @@ function TransactionDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {showProfileField && (
+            <div className="space-y-2">
+              <Label>Perfil</Label>
+              <Select
+                value={profileId}
+                onValueChange={(value) => {
+                  setProfileId(value);
+                  setCategoryId('');
+                  setSubcategoryId('');
+                  if (profiles.find((p) => p.id === value)?.kind === 'pj' && kind === 'reserva') {
+                    setKind('despesa');
+                    setReserveId('');
+                  }
+                }}
+              >
+                <SelectTrigger aria-label="Perfil">
+                  <SelectValue placeholder="Escolha o perfil" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="swatch h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                        {profileLabel(p)}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div>
             <Label className="mb-2 block">Tipo</Label>
             <div className="grid grid-cols-3 gap-2">
@@ -318,6 +387,8 @@ function TransactionDialog({
                 <button
                   key={k}
                   type="button"
+                  disabled={k === 'reserva' && isCompany}
+                  title={k === 'reserva' && isCompany ? 'Empresas não fazem aporte em metas' : undefined}
                   onClick={() => {
                     setKind(k);
                     setCategoryId('');
@@ -325,7 +396,7 @@ function TransactionDialog({
                     if (k !== 'reserva') setReserveId('');
                   }}
                   className={cn(
-                    'py-2 px-3 rounded-md border text-sm transition-colors',
+                    'py-2 px-3 rounded-md border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                     kind === k
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-input hover:bg-muted',
@@ -408,7 +479,7 @@ function TransactionDialog({
                   setSubcategoryId('');
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Categoria">
                   <SelectValue placeholder="Sem categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -431,7 +502,7 @@ function TransactionDialog({
             <div className="space-y-2">
               <Label>Subcategoria</Label>
               <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={!categoryId}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Subcategoria">
                   <SelectValue placeholder="Opcional" />
                 </SelectTrigger>
                 <SelectContent>

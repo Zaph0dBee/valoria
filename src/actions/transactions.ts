@@ -9,6 +9,7 @@ const IdSchema = z.string().uuid();
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
 
 const TransactionSchema = z.object({
+  profile_id: IdSchema,
   occurred_on: DateSchema,
   amount: z.coerce.number().finite().positive(),
   kind: z.enum(['receita', 'despesa', 'reserva']),
@@ -27,7 +28,7 @@ const TransactionUpdateSchema = TransactionSchema.partial().refine(
 type TransactionInput = z.infer<typeof TransactionSchema>;
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-type RelationInput = Pick<TransactionInput, 'kind' | 'category_id' | 'subcategory_id' | 'reserve_id'>;
+type RelationInput = Pick<TransactionInput, 'profile_id' | 'kind' | 'category_id' | 'subcategory_id' | 'reserve_id'>;
 
 async function validateRelations(
   supabase: SupabaseClient,
@@ -38,10 +39,22 @@ async function validateRelations(
     return 'Selecione uma categoria antes da subcategoria';
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('financial_profiles')
+    .select('id, kind, archived')
+    .eq('id', input.profile_id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (profileError) return profileError.message;
+  if (!profile) return 'Perfil não encontrado';
+  if (profile.kind === 'pj' && input.kind === 'reserva') {
+    return 'Empresas não fazem aporte em metas. Transfira para a PF primeiro.';
+  }
+
   if (input.category_id) {
     const { data: category, error } = await supabase
       .from('categories')
-      .select('id, kind')
+      .select('id, kind, profile_id')
       .eq('id', input.category_id)
       .eq('user_id', userId)
       .eq('archived', false)
@@ -50,6 +63,7 @@ async function validateRelations(
     if (error) return error.message;
     if (!category) return 'Categoria não encontrada';
     if (category.kind !== input.kind) return 'A categoria não corresponde ao tipo do lançamento';
+    if (category.profile_id !== input.profile_id) return 'A categoria pertence a outro perfil';
   }
 
   if (input.subcategory_id && input.category_id) {
@@ -125,7 +139,7 @@ export async function updateTransaction(
 
   const { data: existing, error: existingError } = await supabase
     .from('transactions')
-    .select('kind, category_id, subcategory_id, reserve_id')
+    .select('profile_id, kind, category_id, subcategory_id, reserve_id')
     .eq('id', parsedId.data)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -134,6 +148,7 @@ export async function updateTransaction(
   if (!existing) return { error: 'Lançamento não encontrado' };
 
   const merged: RelationInput = {
+    profile_id: parsed.data.profile_id ?? existing.profile_id,
     kind: parsed.data.kind ?? existing.kind,
     category_id:
       parsed.data.category_id !== undefined ? parsed.data.category_id : existing.category_id,
