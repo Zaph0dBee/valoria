@@ -1,27 +1,35 @@
 import { createClient } from '@/lib/supabase/server';
 import { CategoriesClient } from './categories-client';
+import { getProfileContext } from '@/lib/profile-context';
+import { ChooseProfile } from '@/components/choose-profile';
 
 export default async function CategoriasPage() {
   const supabase = await createClient();
+  const profileCtx = await getProfileContext();
+  const profileId = profileCtx.active.mode === 'profile' ? profileCtx.active.profileId : null;
 
-  const [catRes, subRes, reserveRes] = await Promise.all([
-    supabase
-      .from('categories')
-      .select('id, name, kind, color, sort_order, group, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id')
-      .eq('archived', false)
-      .order('kind')
-      .order('sort_order'),
-    supabase
-      .from('subcategories')
-      .select('id, category_id, name, sort_order, group_override, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id')
-      .eq('archived', false)
-      .order('sort_order'),
-    supabase
-      .from('reserves')
-      .select('id, name')
-      .eq('archived', false)
-      .order('name'),
-  ]);
+  const [catRes, subRes, reserveRes] = profileId
+    ? await Promise.all([
+        supabase
+          .from('categories')
+          .select('id, name, kind, color, sort_order, group, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id')
+          .eq('archived', false)
+          .eq('profile_id', profileId)
+          .order('kind')
+          .order('sort_order'),
+        supabase
+          .from('subcategories')
+          .select('id, category_id, name, sort_order, group_override, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id, categories!inner(profile_id)')
+          .eq('archived', false)
+          .eq('categories.profile_id', profileId)
+          .order('sort_order'),
+        supabase
+          .from('reserves')
+          .select('id, name')
+          .eq('archived', false)
+          .order('name'),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
 
   return (
     <div className="space-y-6">
@@ -33,11 +41,20 @@ export default async function CategoriasPage() {
         </p>
       </div>
 
-      <CategoriesClient
-        categories={catRes.data ?? []}
-        subcategories={subRes.data ?? []}
-        reserves={reserveRes.data ?? []}
-      />
+      {profileId ? (
+        <CategoriesClient
+          categories={catRes.data ?? []}
+          subcategories={subRes.data ?? []}
+          reserves={reserveRes.data ?? []}
+          profileId={profileId}
+          isCompany={profileCtx.activeProfile?.kind === 'pj'}
+        />
+      ) : (
+        <ChooseProfile
+          message="Escolha um perfil para ver e editar categorias."
+          profiles={profileCtx.activeProfiles}
+        />
+      )}
     </div>
   );
 }

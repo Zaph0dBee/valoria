@@ -117,11 +117,19 @@ export function CategoriesClient({
   categories,
   subcategories,
   reserves,
+  profileId,
+  isCompany,
 }: {
   categories: Cat[];
   subcategories: Sub[];
   reserves: ReserveOption[];
+  profileId: string;
+  /** Empresa não tem categorias de aporte (Construção / Aportes). */
+  isCompany: boolean;
 }) {
+  const kinds = isCompany
+    ? (['receita', 'despesa'] as const)
+    : (['receita', 'despesa', 'reserva'] as const);
   const [newCatKind, setNewCatKind] = React.useState<TransactionKind | null>(null);
   const [subCatFor, setSubCatFor] = React.useState<Cat | null>(null);
   const [editingCategory, setEditingCategory] = React.useState<Cat | null>(null);
@@ -157,7 +165,7 @@ export function CategoriesClient({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
-      {(['receita', 'despesa', 'reserva'] as const).map((kind) => {
+      {kinds.map((kind) => {
         const cats = categories.filter((c) => c.kind === kind);
         return (
           <Card key={kind}>
@@ -284,6 +292,7 @@ export function CategoriesClient({
       })}
 
       <NewCategoryDialog
+        profileId={profileId}
         open={newCatKind !== null}
         onOpenChange={(open) => !open && setNewCatKind(null)}
         kind={newCatKind}
@@ -314,10 +323,12 @@ export function CategoriesClient({
 }
 
 function NewCategoryDialog({
+  profileId,
   open,
   onOpenChange,
   kind,
 }: {
+  profileId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   kind: TransactionKind | null;
@@ -333,6 +344,7 @@ function NewCategoryDialog({
     setLoading(true);
     const formData = new FormData(event.currentTarget);
     const res = await createCategory({
+      profile_id: profileId,
       name: formData.get('name') as string,
       kind,
       color,

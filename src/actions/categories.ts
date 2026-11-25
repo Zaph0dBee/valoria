@@ -20,6 +20,7 @@ const PlanningFieldsSchema = z.object({
 });
 
 const CategorySchema = z.object({
+  profile_id: IdSchema,
   name: z.string().trim().min(1).max(60),
   kind: z.enum(['receita', 'despesa', 'reserva']),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#B99154'),

@@ -56,3 +56,19 @@ test('painel por perfil', async ({ page }) => {
 
   await switchProfile(page, 'Você (PF)');
 });
+
+test('categorias por perfil', async ({ page }) => {
+  await page.goto('/categorias');
+  await switchProfile(page, COMPANY);
+  await expect(page.getByRole('button', { name: 'Impostos (DAS/Simples)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Casa', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Construção / Aportes')).toHaveCount(0);
+
+  await switchProfile(page, 'Você (PF)');
+  await expect(page.getByRole('button', { name: 'Casa', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Impostos (DAS/Simples)' })).toHaveCount(0);
+
+  await switchProfile(page, 'Consolidado');
+  await expect(page.getByText('Escolha um perfil para ver e editar categorias.')).toBeVisible();
+  await switchProfile(page, 'Você (PF)');
+});
