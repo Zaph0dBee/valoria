@@ -18,11 +18,12 @@ export default async function TransacoesPage({
 
   let txQuery = supabase
     .from('transactions')
-    .select('id, profile_id, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name), financial_profiles!transactions_profile_id_fkey(name, color, kind)')
+    .select('id, profile_id, counterpart_profile_id, transfer_reason, occurred_on, amount, kind, description, notes, category_id, subcategory_id, reserve_id, categories(name, color), reserves(name), financial_profiles!transactions_profile_id_fkey(name, color, kind)')
     .order('occurred_on', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(200);
-  if (profileId) txQuery = txQuery.eq('profile_id', profileId);
+  // A visão de um perfil inclui as transferências que ele RECEBE.
+  if (profileId) txQuery = txQuery.or(`profile_id.eq.${profileId},counterpart_profile_id.eq.${profileId}`);
 
   const [txRes, catRes, subRes, reserveRes] = await Promise.all([
     txQuery,
@@ -57,6 +58,7 @@ export default async function TransacoesPage({
         defaultProfileId={profileId ?? profileCtx.pf?.id ?? ''}
         showProfileField={profileCtx.showSelector}
         showProfileTag={profileId === null}
+        viewProfileId={profileId}
       />
     </div>
   );

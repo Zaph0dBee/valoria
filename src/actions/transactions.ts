@@ -18,6 +18,8 @@ const TransactionSchema = z.object({
   reserve_id: z.string().uuid().nullable().optional(),
   description: z.string().trim().min(1).max(200),
   notes: z.string().trim().max(500).optional().nullable(),
+  counterpart_profile_id: IdSchema.nullable().optional(),
+  transfer_reason: z.enum(['pro_labore', 'lucros', 'aporte_capital', 'outro']).nullable().optional(),
 });
 
 const TransactionUpdateSchema = TransactionSchema.partial().refine(
@@ -28,13 +30,16 @@ const TransactionUpdateSchema = TransactionSchema.partial().refine(
 type TransactionInput = z.infer<typeof TransactionSchema>;
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-type RelationInput = Pick<TransactionInput, 'profile_id' | 'kind' | 'category_id' | 'subcategory_id' | 'reserve_id'>;
+type RelationInput = Pick<
+  TransactionInput,
+  'profile_id' | 'kind' | 'category_id' | 'subcategory_id' | 'reserve_id' | 'counterpart_profile_id' | 'transfer_reason'
+>;
 
 async function validateRelations(
   supabase: SupabaseClient,
   userId: string,
   input: RelationInput,
-  options: { allowArchivedProfile?: boolean } = {},
+  options: { allowArchivedProfile?: boolean; allowArchivedCounterpart?: boolean } = {},
 ): Promise<string | null> {
   if (input.subcategory_id && !input.category_id) {
     return 'Selecione uma categoria antes da subcategoria';
@@ -53,6 +58,34 @@ async function validateRelations(
   }
   if (profile.kind === 'pj' && input.kind === 'reserva') {
     return 'Empresas não fazem aporte em metas. Transfira para a PF primeiro.';
+  }
+
+  if (input.kind === 'transferencia') {
+    if (!input.counterpart_profile_id) return 'Escolha para qual perfil vai a transferência';
+    if (!input.transfer_reason) return 'Escolha o motivo da transferência';
+    if (input.counterpart_profile_id === input.profile_id) return 'Origem e destino precisam ser perfis diferentes';
+    if (input.category_id || input.subcategory_id || input.reserve_id) {
+      return 'Transferência não tem categoria nem meta';
+    }
+    const { data: counterpart, error: counterpartError } = await supabase
+      .from('financial_profiles')
+      .select('id, kind, archived')
+      .eq('id', input.counterpart_profile_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (counterpartError) return counterpartError.message;
+    if (!counterpart) return 'Perfil de destino inválido';
+    if (counterpart.archived && !options.allowArchivedCounterpart) return 'O perfil de destino está arquivado';
+    if (['pro_labore', 'lucros'].includes(input.transfer_reason) && !(profile.kind === 'pj' && counterpart.kind === 'pf')) {
+      return 'Pró-labore e lucros vão da empresa para a PF';
+    }
+    if (input.transfer_reason === 'aporte_capital' && !(profile.kind === 'pf' && counterpart.kind === 'pj')) {
+      return 'Aporte de capital vai da PF para a empresa';
+    }
+    return null;
+  }
+  if (input.counterpart_profile_id || input.transfer_reason) {
+    return 'Só transferências têm perfil de destino';
   }
 
   if (input.category_id) {
@@ -143,7 +176,7 @@ export async function updateTransaction(
 
   const { data: existing, error: existingError } = await supabase
     .from('transactions')
-    .select('profile_id, kind, category_id, subcategory_id, reserve_id')
+    .select('profile_id, kind, category_id, subcategory_id, reserve_id, counterpart_profile_id, transfer_reason')
     .eq('id', parsedId.data)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -153,6 +186,12 @@ export async function updateTransaction(
 
   const merged: RelationInput = {
     profile_id: parsed.data.profile_id ?? existing.profile_id,
+    counterpart_profile_id:
+      parsed.data.counterpart_profile_id !== undefined
+        ? parsed.data.counterpart_profile_id
+        : existing.counterpart_profile_id,
+    transfer_reason:
+      parsed.data.transfer_reason !== undefined ? parsed.data.transfer_reason : existing.transfer_reason,
     kind: parsed.data.kind ?? existing.kind,
     category_id:
       parsed.data.category_id !== undefined ? parsed.data.category_id : existing.category_id,
@@ -168,6 +207,7 @@ export async function updateTransaction(
   // mover um lançamento para uma empresa arquivada, não.
   const relationError = await validateRelations(supabase, user.id, merged, {
     allowArchivedProfile: merged.profile_id === existing.profile_id,
+    allowArchivedCounterpart: merged.counterpart_profile_id === existing.counterpart_profile_id,
   });
   if (relationError) return { error: relationError };
 

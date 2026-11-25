@@ -28,11 +28,15 @@ import { formatDate, formatMoney, todayISO } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ProfileKind, TransactionKind } from '@/types/database';
 import { profileLabel } from '@/lib/profile-selection';
+import { TRANSFER_REASON_LABELS, transferView } from '@/lib/transfers';
+import type { TransferReason } from '@/types/database';
 import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 type Tx = {
   id: string;
   profile_id: string;
+  counterpart_profile_id: string | null;
+  transfer_reason: TransferReason | null;
   occurred_on: string;
   amount: number;
   kind: TransactionKind;
@@ -70,6 +74,7 @@ export function TransactionsClient({
   defaultProfileId,
   showProfileField,
   showProfileTag,
+  viewProfileId,
 }: {
   initialTransactions: Tx[];
   categories: Cat[];
@@ -84,7 +89,23 @@ export function TransactionsClient({
   showProfileField: boolean;
   /** Mostra a etiqueta do perfil em cada lançamento (Consolidado). */
   showProfileTag: boolean;
+  /** Perfil da visão atual (null no Consolidado): define o sinal das transferências. */
+  viewProfileId: string | null;
 }) {
+  const profileNames = Object.fromEntries(profiles.map((p) => [p.id, profileLabel(p)]));
+  const transferOf = (tx: Tx) =>
+    tx.kind === 'transferencia' && tx.counterpart_profile_id && tx.transfer_reason
+      ? transferView(
+          {
+            profile_id: tx.profile_id,
+            counterpart_profile_id: tx.counterpart_profile_id,
+            transfer_reason: tx.transfer_reason,
+            amount: Number(tx.amount),
+          },
+          viewProfileId,
+          profileNames,
+        )
+      : null;
   const [open, setOpen] = React.useState(openNewOnMount);
   const [editing, setEditing] = React.useState<Tx | null>(null);
   const router = useRouter();
@@ -163,6 +184,7 @@ export function TransactionsClient({
                       {tx.categories?.name ?? 'Sem categoria'}
                       {tx.kind === 'reserva' && tx.reserves ? ` · ${tx.reserves.name}` : ''}
                       {showProfileTag && tx.financial_profiles ? ` · ${profileLabel(tx.financial_profiles)}` : ''}
+                      {transferOf(tx) ? ` · ${transferOf(tx)!.label}` : ''}
                     </span>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -173,7 +195,9 @@ export function TransactionsClient({
                           {profileLabel(tx.financial_profiles)}
                         </span>
                       )}
-                      {tx.categories ? (
+                      {transferOf(tx) ? (
+                        <span className="text-xs">{transferOf(tx)!.label}</span>
+                      ) : tx.categories ? (
                         <span className="inline-flex items-center gap-2 text-xs">
                           <span
                             className="swatch h-2 w-2 rounded-full"
@@ -198,9 +222,14 @@ export function TransactionsClient({
                       tx.kind === 'receita' && 'text-positive',
                       tx.kind === 'despesa' && 'text-destructive',
                       tx.kind === 'reserva' && 'text-primary',
+                      transferOf(tx)?.sign === 1 && 'text-positive',
+                      transferOf(tx)?.sign === -1 && 'text-destructive',
+                      transferOf(tx)?.sign === 0 && 'text-muted-foreground',
                     )}
                   >
-                    {tx.kind === 'despesa' || tx.kind === 'reserva' ? '−' : '+'}
+                    {transferOf(tx)
+                      ? transferOf(tx)!.sign === 1 ? '+' : transferOf(tx)!.sign === -1 ? '−' : ''
+                      : tx.kind === 'despesa' || tx.kind === 'reserva' ? '−' : '+'}
                     {formatMoney(Number(tx.amount))}
                   </TableCell>
                   <TableCell className="pl-0 pr-2 sm:px-4">
@@ -283,8 +312,27 @@ function TransactionDialog({
   const [subcategoryId, setSubcategoryId] = React.useState<string>(editing?.subcategory_id ?? '');
   const [reserveId, setReserveId] = React.useState<string>(editing?.reserve_id ?? initialReserveId ?? '');
   const [profileId, setProfileId] = React.useState<string>(editing?.profile_id ?? defaultProfileId);
+  const [counterpartId, setCounterpartId] = React.useState<string>(editing?.counterpart_profile_id ?? '');
+  const [reason, setReason] = React.useState<TransferReason | ''>(editing?.transfer_reason ?? '');
   const selectedProfile = profiles.find((p) => p.id === profileId);
   const isCompany = selectedProfile?.kind === 'pj';
+  const isTransfer = kind === 'transferencia';
+  const pf = profiles.find((p) => p.kind === 'pf');
+  const firstCompany = profiles.find((p) => p.kind === 'pj');
+
+  // Ao escolher o motivo, ajusta origem e destino para a direção válida.
+  function chooseReason(next: TransferReason) {
+    setReason(next);
+    if (next === 'pro_labore' || next === 'lucros') {
+      const origin = isCompany ? profileId : firstCompany?.id ?? profileId;
+      setProfileId(origin);
+      setCounterpartId(pf?.id ?? '');
+    } else if (next === 'aporte_capital') {
+      const company = isCompany ? profileId : counterpartId || firstCompany?.id || '';
+      setProfileId(pf?.id ?? profileId);
+      setCounterpartId(company);
+    }
+  }
 
   React.useEffect(() => {
     if (open) {
@@ -299,6 +347,8 @@ function TransactionDialog({
       setCategoryId(editing?.category_id ?? '');
       setSubcategoryId(editing?.subcategory_id ?? '');
       setReserveId(editing?.reserve_id ?? suggestedReserve);
+      setCounterpartId(editing?.counterpart_profile_id ?? '');
+      setReason(editing?.transfer_reason ?? '');
     }
   }, [open, editing, initialKind, initialReserveId, reserves, defaultProfileId, profiles]);
 
@@ -314,9 +364,11 @@ function TransactionDialog({
       occurred_on: fd.get('occurred_on') as string,
       amount: parseMoney(fd.get('amount')) ?? Number.NaN,
       kind,
-      category_id: categoryId || null,
-      subcategory_id: subcategoryId || null,
+      category_id: isTransfer ? null : categoryId || null,
+      subcategory_id: isTransfer ? null : subcategoryId || null,
       reserve_id: kind === 'reserva' ? reserveId || null : null,
+      counterpart_profile_id: isTransfer ? counterpartId || null : null,
+      transfer_reason: isTransfer ? reason || null : null,
       description: fd.get('description') as string,
       notes: (fd.get('notes') as string) || null,
     };
@@ -331,7 +383,13 @@ function TransactionDialog({
       return;
     }
     toast({
-      title: editing ? 'Lançamento atualizado' : kind === 'reserva' ? 'Aporte registrado' : 'Lançamento criado',
+      title: editing
+        ? 'Lançamento atualizado'
+        : kind === 'reserva'
+          ? 'Aporte registrado'
+          : isTransfer
+            ? 'Transferência registrada'
+            : 'Lançamento criado',
       description: kind === 'reserva' && reserveId ? 'O progresso da meta foi atualizado automaticamente.' : undefined,
     });
     onOpenChange(false);
@@ -351,7 +409,7 @@ function TransactionDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {showProfileField && (
             <div className="space-y-2">
-              <Label>Perfil</Label>
+              <Label>{isTransfer ? 'De' : 'Perfil'}</Label>
               <Select
                 value={profileId}
                 onValueChange={(value) => {
@@ -383,8 +441,11 @@ function TransactionDialog({
 
           <div>
             <Label className="mb-2 block">Tipo</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['receita', 'despesa', 'reserva'] as const).map((k) => (
+            <div className={cn('grid gap-2', showProfileField ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
+              {(showProfileField
+                ? (['receita', 'despesa', 'reserva', 'transferencia'] as const)
+                : (['receita', 'despesa', 'reserva'] as const)
+              ).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -395,6 +456,10 @@ function TransactionDialog({
                     setCategoryId('');
                     setSubcategoryId('');
                     if (k !== 'reserva') setReserveId('');
+                    if (k !== 'transferencia') {
+                      setCounterpartId('');
+                      setReason('');
+                    }
                   }}
                   className={cn(
                     'py-2 px-3 rounded-md border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40',
@@ -445,6 +510,47 @@ function TransactionDialog({
             />
           </div>
 
+          {isTransfer && (
+            <div className="grid grid-cols-2 gap-4 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="space-y-2">
+                <Label>Motivo</Label>
+                <Select value={reason} onValueChange={(v) => chooseReason(v as TransferReason)}>
+                  <SelectTrigger aria-label="Motivo">
+                    <SelectValue placeholder="Escolha" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(TRANSFER_REASON_LABELS) as TransferReason[]).map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r === 'outro' ? 'Outro' : TRANSFER_REASON_LABELS[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Para</Label>
+                <Select value={counterpartId} onValueChange={setCounterpartId}>
+                  <SelectTrigger aria-label="Para">
+                    <SelectValue placeholder="Destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles
+                      .filter((p) => p.id !== profileId)
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {profileLabel(p)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="col-span-2 text-xs text-muted-foreground">
+                Pró-labore e lucros vão da empresa para você; aporte de capital vai de você para a empresa.
+                Lançado uma vez, aparece nos dois perfis e não conta em dobro no Consolidado.
+              </p>
+            </div>
+          )}
+
           {kind === 'reserva' && (
             <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <Label>Destino do aporte</Label>
@@ -470,6 +576,7 @@ function TransactionDialog({
             </div>
           )}
 
+          {!isTransfer && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Categoria</Label>
@@ -514,6 +621,7 @@ function TransactionDialog({
               </Select>
             </div>
           </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>

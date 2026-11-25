@@ -204,3 +204,31 @@ test('pró-labore aparece na PF e não duplica no consolidado', async ({ page })
   await expect(page.getByTestId('summary-entradas')).toContainText('R$ 10.000,00');
   await switchProfile(page, 'Você (PF)');
 });
+
+test('transferência pró-labore aparece nos dois perfis', async ({ page }) => {
+  const description = `Transf ${RUN_ID}`;
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, {
+    kind: 'Transferência', reason: 'Pró-labore', to: 'Você (PF)',
+    amount: '1.234,00', description, date: '2026-02-10',
+  });
+  const row = page.getByRole('row', { name: new RegExp(description) });
+  await expect(row).toContainText('−R$ 1.234,00');
+  await expect(row).toContainText('Pró-labore → Você (PF)');
+
+  await switchProfile(page, 'Você (PF)');
+  await expect(row).toContainText('+R$ 1.234,00');
+  await expect(row).toContainText(`Pró-labore · ${COMPANY}`);
+});
+
+test('apagar transferência some dos dois perfis', async ({ page }) => {
+  const description = `Transf ${RUN_ID}`;
+  acceptDialogs(page);
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await page.getByRole('button', { name: `Apagar ${description}` }).click();
+  await expect(page.getByRole('row', { name: new RegExp(description) })).toHaveCount(0);
+  await switchProfile(page, 'Você (PF)');
+  await expect(page.getByRole('row', { name: new RegExp(description) })).toHaveCount(0);
+});
