@@ -19,11 +19,13 @@ import { removeMonthlyOpeningBalance, setMonthlyOpeningBalance } from '@/actions
 import { parseMoney, formatMoneyInput } from '@/lib/money';
 
 export function OpeningBalanceEditor({
+  profileId,
   year,
   month,
   currentValue,
   isManual,
 }: {
+  profileId: string;
   year: number;
   month: number;
   currentValue: number;
@@ -39,7 +41,7 @@ export function OpeningBalanceEditor({
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     const value = parseMoney(fd.get('opening_balance')) ?? Number.NaN;
-    const res = await setMonthlyOpeningBalance({ year, month, opening_balance: value });
+    const res = await setMonthlyOpeningBalance({ profile_id: profileId, year, month, opening_balance: value });
     setLoading(false);
 
     if (res.error) {
@@ -54,7 +56,7 @@ export function OpeningBalanceEditor({
 
   async function handleAutomatic() {
     setLoading(true);
-    const res = await removeMonthlyOpeningBalance(year, month);
+    const res = await removeMonthlyOpeningBalance(year, month, profileId);
     setLoading(false);
 
     if (res.error) {

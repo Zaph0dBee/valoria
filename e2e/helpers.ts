@@ -11,9 +11,18 @@ export async function openNewTransaction(page: Page, kind: 'receita' | 'despesa'
   return dialog;
 }
 
+const acceptingPages = new WeakSet<Page>();
+
+/** Aceita automaticamente os confirm() da página (registra uma única vez). */
+export function acceptDialogs(page: Page) {
+  if (acceptingPages.has(page)) return;
+  acceptingPages.add(page);
+  page.on('dialog', (d) => d.accept().catch(() => undefined));
+}
+
 /** Apaga, pela interface, todos os lançamentos cuja descrição contém `text`. */
 export async function deleteTransactionsContaining(page: Page, text: string) {
-  page.on('dialog', (d) => d.accept());
+  acceptDialogs(page);
   await page.goto('/transacoes');
   const buttons = page.getByRole('button', { name: new RegExp(`^Apagar .*${escapeRegex(text)}`) });
   while ((await buttons.count()) > 0) {

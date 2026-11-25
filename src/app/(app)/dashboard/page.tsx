@@ -7,6 +7,8 @@ import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { NCEDistribution } from '@/components/dashboard/nce-distribution';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { getProfileContext } from '@/lib/profile-context';
+import { profileLabel } from '@/lib/profile-selection';
 
 type FinancialSummary = {
   month: string;
@@ -54,6 +56,10 @@ export default async function DashboardPage({
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const profileCtx = await getProfileContext();
+  const profileId = profileCtx.active.mode === 'profile' ? profileCtx.active.profileId : null;
+  const showNce = profileCtx.activeProfile?.kind === 'pf';
+  const scopeLabel = profileCtx.activeProfile ? profileLabel(profileCtx.activeProfile) : 'Consolidado';
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -64,33 +70,41 @@ export default async function DashboardPage({
   const firstName = (profile?.full_name ?? user?.email ?? '').split(' ')[0].split('@')[0];
   const capitalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
+  let breakdownQuery = supabase
+    .from('category_breakdown')
+    .select('*')
+    .eq('month', start)
+    .order('total', { ascending: false });
+  let recentQuery = supabase
+    .from('transactions')
+    .select('id, occurred_on, amount, kind, description, category_id, categories(name, color)')
+    .gte('occurred_on', start)
+    .lte('occurred_on', end)
+    .order('occurred_on', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (profileId) {
+    breakdownQuery = breakdownQuery.eq('profile_id', profileId);
+    recentQuery = recentQuery.eq('profile_id', profileId);
+  }
+
   const [summaryRes, breakdownRes, recentRes, prevRes, nceRes, openingRes] = await Promise.all([
-    supabase.rpc('get_monthly_financial_summary', { target_year: year, target_month: month }),
-    supabase
-      .from('category_breakdown')
-      .select('*')
-      .eq('month', start)
-      .order('total', { ascending: false }),
-    supabase
-      .from('transactions')
-      .select('id, occurred_on, amount, kind, description, category_id, categories(name, color)')
-      .gte('occurred_on', start)
-      .lte('occurred_on', end)
-      .order('occurred_on', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase.rpc('get_monthly_financial_summary', { target_year: prevY, target_month: prevM }),
-    supabase
-      .from('nce_distribution')
-      .select('group_name, total')
-      .eq('month', start),
-    supabase
-      .from('monthly_balances')
-      .select('id')
-      .eq('user_id', user!.id)
-      .eq('year', year)
-      .eq('month', month)
-      .maybeSingle(),
+    supabase.rpc('get_monthly_financial_summary', { target_year: year, target_month: month, target_profile: profileId }),
+    breakdownQuery,
+    recentQuery,
+    supabase.rpc('get_monthly_financial_summary', { target_year: prevY, target_month: prevM, target_profile: profileId }),
+    showNce && profileId
+      ? supabase.from('nce_distribution').select('group_name, total').eq('month', start).eq('profile_id', profileId)
+      : Promise.resolve({ data: [] }),
+    profileId
+      ? supabase
+          .from('monthly_balances')
+          .select('id')
+          .eq('profile_id', profileId)
+          .eq('year', year)
+          .eq('month', month)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const summary = (summaryRes.data?.[0] ?? { ...EMPTY_SUMMARY, month: start }) as FinancialSummary;
@@ -101,7 +115,10 @@ export default async function DashboardPage({
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="eyebrow mb-2">painel · {formatMonthName(month, year).toLowerCase()}</p>
+          <p className="eyebrow mb-2">
+            painel · {profileCtx.showSelector && `${scopeLabel.toLowerCase()} · `}
+            {formatMonthName(month, year).toLowerCase()}
+          </p>
           <h1 className="font-display text-4xl md:text-5xl tracking-tight">
             Olá, {capitalizedName}.
           </h1>
@@ -128,9 +145,10 @@ export default async function DashboardPage({
         year={year}
         month={month}
         openingIsManual={Boolean(openingRes.data)}
+        profileId={profileId}
       />
 
-      <NCEDistribution items={nceRes.data ?? []} totalIncome={totalIncome} />
+      {showNce && <NCEDistribution items={nceRes.data ?? []} totalIncome={totalIncome} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CategoryBreakdown items={breakdownRes.data ?? []} />

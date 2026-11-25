@@ -21,12 +21,15 @@ export function MonthSummary({
   year,
   month,
   openingIsManual,
+  profileId,
 }: {
   summary: Summary;
   prevOperationalResult: number | null;
   year: number;
   month: number;
   openingIsManual: boolean;
+  /** null no Consolidado: o saldo inicial é definido por perfil. */
+  profileId: string | null;
 }) {
   const opening = Number(summary.saldo_inicial ?? 0);
   const receita = Number(summary.total_receita ?? 0);
@@ -78,15 +81,18 @@ export function MonthSummary({
             <div>
               <div className="flex items-center gap-1">
                 <p className="eyebrow">saldo inicial</p>
-                <OpeningBalanceEditor
-                  year={year}
-                  month={month}
-                  currentValue={opening}
-                  isManual={openingIsManual}
-                />
+                {profileId && (
+                  <OpeningBalanceEditor
+                    profileId={profileId}
+                    year={year}
+                    month={month}
+                    currentValue={opening}
+                    isManual={openingIsManual}
+                  />
+                )}
               </div>
               <p className="font-display text-2xl num tracking-tight">{formatMoney(opening)}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">{openingIsManual ? 'definido por você' : 'carregado automaticamente'}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{profileId === null ? 'soma dos perfis' : openingIsManual ? 'definido por você' : 'carregado automaticamente'}</p>
             </div>
             <SummaryItem label="entradas" value={receita} tone="positive" />
             <SummaryItem label="saídas" value={despesa} tone="destructive" />
