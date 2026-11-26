@@ -307,7 +307,7 @@ test('lucro sugerido não é registrado duas vezes em duas abas', async ({ page,
   await expect(page.getByText('Lucro registrado', { exact: true })).toBeVisible();
 
   await other.getByRole('button', { name: 'Registrar lucro de R$ 1.000,00' }).click();
-  await expect(other.getByText(/já foi registrado/)).toBeVisible();
+  await expect(other.getByText(/já foi registrado/).first()).toBeVisible();
   await other.reload();
   await expect(other.getByTestId('company-lucros')).toContainText('R$ 1.000,00');
   await other.close();
