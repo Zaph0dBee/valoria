@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { ResultsChart, type ChartPoint } from './results-chart';
+import { comparisonLines } from '@/lib/report-lines';
 
 type SummaryRow = {
   month: string;
@@ -66,14 +67,7 @@ export default async function RelatoriosPage({
   const byKey = new Map(rows.map((r) => [key(r), r]));
   const get = (ym: string, id: string) => byKey.get(`${ym}|${id}`);
 
-  const lines: { label: string; value: (r: SummaryRow | undefined) => number; strong?: boolean }[] = [
-    { label: 'Entradas', value: (r) => Number(r?.total_receita ?? 0) + Number(r?.entradas_transferidas ?? 0) },
-    { label: 'Saídas', value: (r) => Number(r?.total_despesa ?? 0) },
-    { label: 'Resultado', value: (r) => Number(r?.resultado_operacional ?? 0), strong: true },
-    { label: 'Aportes', value: (r) => Number(r?.total_aportes ?? 0) },
-    { label: 'Transferências', value: (r) => Number(r?.transf_recebidas ?? 0) - Number(r?.transf_enviadas ?? 0) },
-    { label: 'Saldo final', value: (r) => Number(r?.saldo_final ?? 0), strong: true },
-  ];
+  const lineLabels = comparisonLines(undefined);
 
   const months = Array.from({ length: 12 }, (_, i) => shiftMonth(start, i));
   const series = columns.map((p) => ({ id: p.id, label: profileLabel(p) }));
@@ -134,11 +128,11 @@ export default async function RelatoriosPage({
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
+              {lineLabels.map((line, index) => (
                 <tr key={line.label} className={cn('border-b last:border-0', line.strong && 'font-medium')}>
                   <th scope="row" className="py-2 pr-4 text-left font-normal text-muted-foreground">{line.label}</th>
                   {[...columns.map((p) => p.id), CONSOLIDATED].map((id) => {
-                    const value = line.value(get(selected, id));
+                    const value = comparisonLines(get(selected, id))[index].value;
                     return (
                       <td key={id} className={cn('py-2 px-3 text-right num whitespace-nowrap', value < 0 && 'text-destructive')}>
                         {formatMoney(value)}

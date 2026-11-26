@@ -34,4 +34,12 @@ describe('toTransactionsCsv', () => {
   it('protege quebra de linha', () => {
     expect(toTransactionsCsv([{ ...base, description: 'a\nb' }])).toContain(';"a\nb";');
   });
+  it('neutraliza texto que o Excel leria como fórmula, sem mexer no valor', () => {
+    const line = lines(toTransactionsCsv([{ ...base, description: '-PIX ENVIADO', category: '=SOMA(1)' }]))[1];
+    expect(line).toBe("05/01/2026;Você (PF);Despesa;'=SOMA(1);;'-PIX ENVIADO;-1234,56;;");
+    expect(lines(toTransactionsCsv([{ ...base, description: '+Rendimento' }]))[1]).toContain(";'+Rendimento;");
+    expect(lines(toTransactionsCsv([{ ...base, description: '@conta' }]))[1]).toContain(";'@conta;");
+    expect(lines(toTransactionsCsv([{ ...base, description: '12x parcela' }]))[1]).toContain(';12x parcela;');
+    expect(lines(toTransactionsCsv([{ ...base, description: '.net' }]))[1]).toContain(';.net;');
+  });
 });

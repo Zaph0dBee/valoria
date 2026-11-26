@@ -49,10 +49,14 @@ export function CompanyPanel({
     lucros_distribuidos: Number(summary.lucros_distribuidos ?? 0),
   });
 
-  async function register(value: number, occurredOn: string) {
+  async function register(value: number, occurredOn: string, suggested: boolean) {
     setLoading(true);
-    const res = await registerProfitDistribution({ profile_id: profileId, amount: value, occurred_on: occurredOn });
-    setLoading(false);
+    const res = await registerProfitDistribution({
+      profile_id: profileId,
+      amount: value,
+      occurred_on: occurredOn,
+      suggested,
+    }).finally(() => setLoading(false));
     if ('error' in res) {
       toast({ variant: 'destructive', title: 'Erro', description: res.error });
       return;
@@ -70,7 +74,7 @@ export function CompanyPanel({
       toast({ variant: 'destructive', title: 'Erro', description: 'Informe um valor válido' });
       return;
     }
-    void register(value, date);
+    void register(value, date, false);
   }
 
   const rows: { label: string; value: number; positive?: boolean }[] = [
@@ -116,7 +120,7 @@ export function CompanyPanel({
               Resultado do mês menos os lucros já retirados. Registrar cria uma transferência de lucros para você (PF).
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button disabled={loading} onClick={() => void register(s.disponivel, defaultDate)}>
+              <Button disabled={loading} onClick={() => void register(s.disponivel, defaultDate, true)}>
                 Registrar lucro de {formatMoney(s.disponivel)}
               </Button>
               <Button variant="outline" disabled={loading} onClick={() => setCustom((v) => !v)}>

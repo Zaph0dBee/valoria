@@ -22,8 +22,15 @@ const KIND_LABEL: Record<TransactionKind, string> = {
   transferencia: 'Transferência',
 };
 
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function field(value: string): string {
   return /[;"\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** Texto livre que o Excel leria como fórmula ("-PIX", "=SOMA") ganha um apóstrofo. */
+function text(value: string): string {
+  return FORMULA_START.test(value) ? `'${value}` : value;
 }
 
 function brDate(iso: string): string {
@@ -44,13 +51,13 @@ export function toTransactionsCsv(rows: CsvTransaction[]): string {
     const signed = r.kind === 'receita' ? Number(r.amount) : -Number(r.amount);
     return [
       brDate(r.occurred_on),
-      r.profile,
+      text(r.profile),
       KIND_LABEL[r.kind],
-      r.category ?? '',
-      r.subcategory ?? '',
-      r.description,
+      text(r.category ?? ''),
+      text(r.subcategory ?? ''),
+      text(r.description),
       brAmount(signed),
-      r.counterpart ?? '',
+      text(r.counterpart ?? ''),
       r.reason ? TRANSFER_REASON_LABELS[r.reason] : '',
     ]
       .map(field)

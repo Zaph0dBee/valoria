@@ -295,6 +295,24 @@ test('sugestão de lucro registra em 1 clique', async ({ page }) => {
   await expect(row).toContainText('30/04');
 });
 
+test('lucro sugerido não é registrado duas vezes em duas abas', async ({ page, context }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '1.000,00', description: `Venda maio ${RUN_ID}`, date: '2026-05-10' });
+
+  const other = await context.newPage();
+  await page.goto('/dashboard?y=2026&m=5');
+  await other.goto('/dashboard?y=2026&m=5');
+  await page.getByRole('button', { name: 'Registrar lucro de R$ 1.000,00' }).click();
+  await expect(page.getByText('Lucro registrado', { exact: true })).toBeVisible();
+
+  await other.getByRole('button', { name: 'Registrar lucro de R$ 1.000,00' }).click();
+  await expect(other.getByText(/já foi registrado/)).toBeVisible();
+  await other.reload();
+  await expect(other.getByTestId('company-lucros')).toContainText('R$ 1.000,00');
+  await other.close();
+});
+
 test('resultado negativo não sugere lucro', async ({ page }) => {
   await page.goto('/transacoes');
   await switchProfile(page, COMPANY);
