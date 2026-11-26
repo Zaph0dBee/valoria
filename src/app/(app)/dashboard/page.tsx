@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { currentMonth, formatMonthName, monthRange } from '@/lib/format';
+import { currentMonth, formatMonthName, monthRange, todayISO } from '@/lib/format';
 import { MonthSummary } from '@/components/dashboard/month-summary';
 import { CategoryBreakdown } from '@/components/dashboard/category-breakdown';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { NCEDistribution } from '@/components/dashboard/nce-distribution';
+import { CompanyPanel } from '@/components/dashboard/company-panel';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { getProfileContext } from '@/lib/profile-context';
@@ -64,6 +65,7 @@ export default async function DashboardPage({
   const profileCtx = await getProfileContext();
   const profileId = profileCtx.active.mode === 'profile' ? profileCtx.active.profileId : null;
   const showNce = profileCtx.activeProfile?.kind === 'pf';
+  const showCompany = profileCtx.activeProfile?.kind === 'pj' && profileId !== null;
   const scopeLabel = profileCtx.activeProfile ? profileLabel(profileCtx.activeProfile) : 'Consolidado';
 
   const { data: profile } = await supabase
@@ -93,7 +95,7 @@ export default async function DashboardPage({
     recentQuery = recentQuery.or(`profile_id.eq.${profileId},counterpart_profile_id.eq.${profileId}`);
   }
 
-  const [summaryRes, breakdownRes, recentRes, prevRes, nceRes, openingRes] = await Promise.all([
+  const [summaryRes, breakdownRes, recentRes, prevRes, nceRes, openingRes, taxRes] = await Promise.all([
     supabase.rpc('get_monthly_financial_summary', { target_year: year, target_month: month, target_profile: profileId }),
     breakdownQuery,
     recentQuery,
@@ -110,12 +112,22 @@ export default async function DashboardPage({
           .eq('month', month)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    showCompany
+      ? supabase.from('categories').select('id').eq('profile_id', profileId!).eq('is_tax', true)
+      : Promise.resolve({ data: [] as { id: string }[] }),
   ]);
 
   const summary = (summaryRes.data?.[0] ?? { ...EMPTY_SUMMARY, month: start }) as FinancialSummary;
   const prevSummary = prevRes.data?.[0] as FinancialSummary | undefined;
   // Base da distribuição Valoria: receitas + pró-labore/lucros recebidos.
   const totalIncome = Number(summary.total_receita ?? 0) + Number(summary.entradas_transferidas ?? 0);
+  const taxIds = new Set((taxRes.data ?? []).map((c) => c.id));
+  const taxTotal = (breakdownRes.data ?? [])
+    .filter((b) => b.category_id && taxIds.has(b.category_id))
+    .reduce((sum, b) => sum + Number(b.total ?? 0), 0);
+  // O lucro sugerido entra no mês que está sendo visto: hoje no mês atual, senão o último dia do mês.
+  const isCurrentMonth = year === now.year && month === now.month;
+  const profitDate = isCurrentMonth ? todayISO() : end;
   const profileNames = Object.fromEntries(profileCtx.profiles.map((p) => [p.id, profileLabel(p)]));
 
   return (
@@ -156,6 +168,15 @@ export default async function DashboardPage({
       />
 
       {showNce && <NCEDistribution items={nceRes.data ?? []} totalIncome={totalIncome} />}
+      {showCompany && (
+        <CompanyPanel
+          key={`${profileId}-${year}-${month}`}
+          summary={summary}
+          taxTotal={taxTotal}
+          profileId={profileId!}
+          defaultDate={profitDate}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CategoryBreakdown items={breakdownRes.data ?? []} />

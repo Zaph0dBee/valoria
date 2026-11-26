@@ -267,3 +267,41 @@ test('mesma transferência nos dois extratos não duplica', async ({ page }) => 
   await expect(page.getByRole('row', { name: new RegExp(out) })).toContainText('+R$ 3.000,00');
   await expect(page.getByRole('row', { name: new RegExp(incoming) })).toHaveCount(0);
 });
+
+test('sugestão de lucro registra em 1 clique', async ({ page }) => {
+  // Abril/2026 está vazio na empresa; fora do mês atual o lucro entra no último dia do mês visto.
+  const day = '2026-04-20';
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '8.400,00', description: `Venda abril ${RUN_ID}`, date: day });
+  await createTransaction(page, {
+    kind: 'Transferência', reason: 'Pró-labore', to: 'Você (PF)',
+    amount: '3.000,00', description: `Pró-labore abril ${RUN_ID}`, date: day,
+  });
+
+  await page.goto('/dashboard?y=2026&m=4');
+  const card = page.getByTestId('company-disponivel');
+  await expect(card).toContainText('Disponível para distribuir');
+  await expect(card).toContainText('R$ 5.400,00');
+  await page.getByRole('button', { name: 'Registrar lucro de R$ 5.400,00' }).click();
+  await expect(page.getByText('Lucro registrado', { exact: true })).toBeVisible();
+  await expect(card).toContainText('R$ 0,00');
+  await expect(page.getByRole('button', { name: /Registrar lucro de/ })).toHaveCount(0);
+
+  await page.goto('/transacoes');
+  await switchProfile(page, 'Você (PF)');
+  const row = page.getByRole('row', { name: new RegExp(`Lucros · ${COMPANY}`) });
+  await expect(row).toContainText('+R$ 5.400,00');
+  await expect(row).toContainText('30/04');
+});
+
+test('resultado negativo não sugere lucro', async ({ page }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Despesa', amount: '100,00', description: `Custo marco ${RUN_ID}`, date: '2026-03-10' });
+  await page.goto('/dashboard?y=2026&m=3');
+  const card = page.getByTestId('company-disponivel');
+  await expect(card).toContainText('Sem lucro para distribuir');
+  await expect(page.getByRole('button', { name: /Registrar lucro de/ })).toHaveCount(0);
+  await switchProfile(page, 'Você (PF)');
+});
