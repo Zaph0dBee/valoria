@@ -5,7 +5,7 @@ test.describe('acesso', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('rotas protegidas mandam para o login', async ({ page }) => {
-    for (const path of ['/dashboard', '/transacoes', '/categorias', '/metas', '/importar']) {
+    for (const path of ['/dashboard', '/transacoes', '/categorias', '/metas', '/importar', '/relatorios']) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);
     }
@@ -72,4 +72,15 @@ test('importar o mesmo CSV duas vezes não duplica lançamentos', async ({ page 
   await expect(page.getByRole('row', { name: new RegExp(description) })).toHaveCount(1);
 
   await deleteTransactionsContaining(page, RUN_ID);
+});
+
+test('relatórios de quem só tem PF', async ({ page }) => {
+  await page.goto('/dashboard');
+  // Sem empresa, o menu não mostra Relatórios; o acesso direto funciona.
+  await expect(page.getByRole('link', { name: 'Relatórios' })).toHaveCount(0);
+  await page.goto('/relatorios');
+  const table = page.getByTestId('report-comparison');
+  await expect(table.getByRole('columnheader', { name: 'Você (PF)' })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: 'Consolidado' })).toBeVisible();
+  await expect(table.getByRole('columnheader')).toHaveCount(2);
 });

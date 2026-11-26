@@ -13,6 +13,7 @@ import {
   Sun,
   LogOut,
   Building2,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,9 @@ const items = [
   { href: '/metas', label: 'Metas', icon: Target },
   { href: '/importar', label: 'Importar', icon: Upload },
 ];
+
+// Só com 2+ perfis ativos: quem tem só a PF vê o app como antes.
+const REPORTS_ITEM = { href: '/relatorios', label: 'Relatórios', icon: BarChart3 };
 
 export function AppNav({
   userName,
@@ -78,7 +82,7 @@ export function AppNav({
         )}
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {items.map(({ href, label, icon: Icon }) => {
+          {(showSelector ? [...items, REPORTS_ITEM] : items).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
               <Link
@@ -166,6 +170,14 @@ export function AppNav({
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{userName}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {showSelector && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/relatorios">
+                      <BarChart3 className="h-4 w-4" />
+                      Relatórios
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link href="/empresas">
                     <Building2 className="h-4 w-4" />

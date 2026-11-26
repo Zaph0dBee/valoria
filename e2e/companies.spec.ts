@@ -322,3 +322,36 @@ test('marcar categoria da empresa como imposto', async ({ page }) => {
   await expect(page.getByLabel(/É imposto/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancelar' }).click();
 });
+
+test('relatórios comparam perfis e exportam CSV', async ({ page }) => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const description = `Relatorio ${RUN_ID}`;
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '250,00', description, date: today });
+
+  await page.getByRole('link', { name: 'Relatórios' }).first().click();
+  await expect(page).toHaveURL(/\/relatorios/);
+  const table = page.getByTestId('report-comparison');
+  await expect(table.getByRole('columnheader', { name: 'Você (PF)' })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: COMPANY })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: 'Consolidado' })).toBeVisible();
+  await expect(table.getByRole('rowheader', { name: 'Resultado' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Evolução dos últimos 12 meses' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Resultado por perfil/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Retiradas da empresa para você' })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Exportar CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^valoria-\d{4}-\d{2}-a-\d{4}-\d{2}\.csv$/);
+  const content = await download.createReadStream().then(async (stream) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    return Buffer.concat(chunks).toString('utf8');
+  });
+  expect(content).toContain('Data;Perfil;Tipo;Categoria;Subcategoria;Descrição;Valor;Destino;Motivo');
+  expect(content).toContain(description);
+  expect(content).toContain(COMPANY);
+  await switchProfile(page, 'Você (PF)');
+});

@@ -12,6 +12,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/categorias') ||
     pathname.startsWith('/metas') ||
     pathname.startsWith('/importar') ||
+    pathname.startsWith('/relatorios') ||
     pathname.startsWith('/empresas');
 
   if (!userId && isProtectedRoute) {
