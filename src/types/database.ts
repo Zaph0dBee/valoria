@@ -108,6 +108,7 @@ export type Database = {
           include_in_budget: boolean;
           planning_notes: string | null;
           default_reserve_id: string | null;
+          is_tax: boolean;
           created_at: string;
         };
         Insert: {
@@ -116,6 +117,7 @@ export type Database = {
           profile_id?: string;
           name: string;
           kind: CategoryKind;
+          is_tax?: boolean;
           color?: string;
           icon?: string | null;
           sort_order?: number;
@@ -136,6 +138,7 @@ export type Database = {
           profile_id?: string;
           name?: string;
           kind?: CategoryKind;
+          is_tax?: boolean;
           color?: string;
           icon?: string | null;
           sort_order?: number;
@@ -542,6 +545,12 @@ export type Database = {
           pro_labore_pago: number;
           lucros_distribuidos: number;
         }[];
+      };
+      get_monthly_summaries: {
+        Args: { start_month: string; months: number };
+        Returns: (Database['public']['Functions']['get_monthly_financial_summary']['Returns'][number] & {
+          profile_id: string | null;
+        })[];
       };
     };
     Enums: {
