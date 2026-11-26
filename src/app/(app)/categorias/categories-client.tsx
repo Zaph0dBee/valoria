@@ -52,6 +52,7 @@ type Cat = {
   include_in_budget: boolean;
   planning_notes: string | null;
   default_reserve_id: string | null;
+  is_tax?: boolean;
 };
 
 type Sub = {
@@ -200,6 +201,14 @@ export function CategoriesClient({
                             >
                               {c.name}
                             </button>
+                            {c.is_tax && (
+                              <span
+                                data-testid={`tax-badge-${c.name}`}
+                                className="mt-0.5 inline-block rounded-sm bg-muted px-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                              >
+                                imposto
+                              </span>
+                            )}
                             {planned !== null && planned > 0 && (
                               <p className="text-[11px] text-muted-foreground mt-0.5">
                                 {formatMoneyCompact(planned)} planejados
@@ -309,6 +318,7 @@ export function CategoriesClient({
         onOpenChange={(open) => !open && setEditingCategory(null)}
         category={editingCategory}
         reserves={reserves}
+        isCompany={isCompany}
       />
 
       <EditSubcategoryDialog
@@ -661,11 +671,13 @@ function EditCategoryDialog({
   onOpenChange,
   category,
   reserves,
+  isCompany,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category: Cat | null;
   reserves: ReserveOption[];
+  isCompany: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -680,9 +692,12 @@ function EditCategoryDialog({
   const [includeInBudget, setIncludeInBudget] = React.useState(true);
   const [planningNotes, setPlanningNotes] = React.useState('');
   const [defaultReserveId, setDefaultReserveId] = React.useState('none');
+  const [isTax, setIsTax] = React.useState(false);
+  const canBeTax = isCompany && category?.kind === 'despesa';
 
   React.useEffect(() => {
     if (!category) return;
+    setIsTax(Boolean(category.is_tax));
     setName(category.name);
     setColor(category.color);
     setGroup(category.group ?? (category.kind === 'reserva' ? 'construcao' : 'none'));
@@ -716,6 +731,7 @@ function EditCategoryDialog({
       include_in_budget: includeInBudget,
       planning_notes: planningNotes.trim() || null,
       default_reserve_id: category.kind === 'reserva' && defaultReserveId !== 'none' ? defaultReserveId : null,
+      ...(canBeTax ? { is_tax: isTax } : {}),
     });
     setLoading(false);
 
@@ -779,6 +795,18 @@ function EditCategoryDialog({
             setDefaultReserveId={setDefaultReserveId}
             reserves={reserves}
           />
+
+          {canBeTax && (
+            <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isTax}
+                onChange={(event) => setIsTax(event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-current"
+              />
+              <span className="block text-sm font-medium">É imposto (entra em &quot;Impostos&quot; no painel da empresa)</span>
+            </label>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

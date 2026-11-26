@@ -12,7 +12,7 @@ export default async function CategoriasPage() {
     ? await Promise.all([
         supabase
           .from('categories')
-          .select('id, name, kind, color, sort_order, group, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id')
+          .select('id, name, kind, color, sort_order, group, planned_amount, recurrence, day_of_month, expense_nature, include_in_budget, planning_notes, default_reserve_id, is_tax')
           .eq('archived', false)
           .eq('profile_id', profileId)
           .order('kind')

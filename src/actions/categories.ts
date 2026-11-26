@@ -30,6 +30,8 @@ const CategoryUpdateSchema = PlanningFieldsSchema.extend({
   name: z.string().trim().min(1).max(60).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   group: GroupSchema.nullable().optional(),
+  /** Só despesas da empresa (o banco também garante). */
+  is_tax: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0, 'Nenhum campo para atualizar');
 
 const SubcategorySchema = z.object({

@@ -305,3 +305,20 @@ test('resultado negativo não sugere lucro', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Registrar lucro de/ })).toHaveCount(0);
   await switchProfile(page, 'Você (PF)');
 });
+
+test('marcar categoria da empresa como imposto', async ({ page }) => {
+  await page.goto('/categorias');
+  await switchProfile(page, COMPANY);
+  await expect(page.getByTestId('tax-badge-Impostos (DAS/Simples)')).toBeVisible();
+  await expect(page.getByTestId('tax-badge-Contabilidade')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Contabilidade', exact: true }).click();
+  await page.getByLabel(/É imposto/).check();
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
+  await expect(page.getByText('Categoria atualizada', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('tax-badge-Contabilidade')).toBeVisible();
+
+  await switchProfile(page, 'Você (PF)');
+  await page.getByRole('button', { name: 'Casa', exact: true }).click();
+  await expect(page.getByLabel(/É imposto/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+});
