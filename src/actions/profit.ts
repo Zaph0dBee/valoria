@@ -2,9 +2,8 @@
 
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { createTransaction } from '@/actions/transactions';
+import { revalidatePath } from 'next/cache';
 import { formatMonthName } from '@/lib/format';
-import { profitSuggestion } from '@/lib/profit';
 
 const ProfitSchema = z.object({
   profile_id: z.string().uuid(),
@@ -41,31 +40,19 @@ export async function registerProfitDistribution(input: {
 
   const [y, m] = parsed.data.occurred_on.split('-').map(Number);
 
-  // Outra aba (ou um clique repetido) pode já ter registrado este lucro.
-  if (parsed.data.suggested) {
-    const { data: summary, error: summaryError } = await supabase.rpc('get_monthly_financial_summary', {
-      target_year: y,
-      target_month: m,
-      target_profile: company.id,
-    });
-    if (summaryError) return { error: summaryError.message };
-    const { disponivel } = profitSuggestion({
-      resultado_operacional: Number(summary?.[0]?.resultado_operacional ?? 0),
-      lucros_distribuidos: Number(summary?.[0]?.lucros_distribuidos ?? 0),
-    });
-    if (Math.round(parsed.data.amount * 100) > Math.round(disponivel * 100)) {
-      return { error: 'Este lucro já foi registrado. Atualize a página para ver o disponível.' };
-    }
-  }
-  const res = await createTransaction({
-    profile_id: company.id,
-    occurred_on: parsed.data.occurred_on,
-    amount: parsed.data.amount,
-    kind: 'transferencia',
-    description: `Lucros de ${formatMonthName(m, y).toLowerCase()} · ${company.name}`,
-    counterpart_profile_id: pf.id,
-    transfer_reason: 'lucros',
+  // Checagem do disponível e gravação numa chamada só, com trava por empresa e mês:
+  // cliques simultâneos em várias abas não registram o mesmo lucro duas vezes.
+  const { error: rpcError } = await supabase.rpc('register_profit_distribution', {
+    target_profile: company.id,
+    profit_amount: parsed.data.amount,
+    profit_date: parsed.data.occurred_on,
+    profit_description: `Lucros de ${formatMonthName(m, y).toLowerCase()} · ${company.name}`,
+    only_available: Boolean(parsed.data.suggested),
   });
-  if ('error' in res && res.error) return { error: res.error };
+  if (rpcError) return { error: rpcError.message };
+
+  revalidatePath('/dashboard');
+  revalidatePath('/transacoes');
+  revalidatePath('/relatorios');
   return { ok: true };
 }

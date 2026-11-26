@@ -295,6 +295,42 @@ test('sugestão de lucro registra em 1 clique', async ({ page }) => {
   await expect(row).toContainText('30/04');
 });
 
+const DUPLICATE_PROFIT = 'Este lucro já foi registrado. Atualize a página para ver o disponível.';
+
+test('cliques simultâneos em várias abas registram o lucro uma vez só', async ({ page, context }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '700,00', description: `Venda junho ${RUN_ID}`, date: '2026-06-10' });
+
+  const tabs = [page, ...(await Promise.all([1, 2, 3].map(() => context.newPage())))];
+  await Promise.all(tabs.map((tab) => tab.goto('/dashboard?y=2026&m=6')));
+  const buttons = tabs.map((tab) => tab.getByRole('button', { name: 'Registrar lucro de R$ 700,00' }));
+  await Promise.all(buttons.map((b) => b.waitFor()));
+  await Promise.all(buttons.map((b) => b.click()));
+  for (const tab of tabs) {
+    await expect(
+      tab.getByText('Lucro registrado', { exact: true }).or(tab.getByText(DUPLICATE_PROFIT, { exact: true })),
+    ).toBeVisible();
+  }
+  await page.reload();
+  await expect(page.getByTestId('company-lucros')).toContainText('R$ 700,00');
+  for (const tab of tabs.slice(1)) await tab.close();
+});
+
+test('queda de conexão ao registrar lucro mostra aviso', async ({ page }) => {
+  await page.goto('/transacoes');
+  await switchProfile(page, COMPANY);
+  await createTransaction(page, { kind: 'Receita', amount: '300,00', description: `Venda julho ${RUN_ID}`, date: '2026-07-10' });
+  await page.goto('/dashboard?y=2026&m=7');
+  await page.route('**/dashboard**', (route) =>
+    route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.continue(),
+  );
+  await page.getByRole('button', { name: 'Registrar lucro de R$ 300,00' }).click();
+  await expect(page.getByText('Não foi possível registrar o lucro. Verifique a conexão e tente de novo.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Registrar lucro de R$ 300,00' })).toBeEnabled();
+  await page.unroute('**/dashboard**');
+});
+
 test('lucro sugerido não é registrado duas vezes em duas abas', async ({ page, context }) => {
   await page.goto('/transacoes');
   await switchProfile(page, COMPANY);
@@ -307,7 +343,10 @@ test('lucro sugerido não é registrado duas vezes em duas abas', async ({ page,
   await expect(page.getByText('Lucro registrado', { exact: true })).toBeVisible();
 
   await other.getByRole('button', { name: 'Registrar lucro de R$ 1.000,00' }).click();
-  await expect(other.getByText(/já foi registrado/).first()).toBeVisible();
+  // Um único aviso visível (o anúncio para leitor de tela tem outro texto ao redor).
+  const notice = other.getByText(DUPLICATE_PROFIT, { exact: true });
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(1);
   await other.reload();
   await expect(other.getByTestId('company-lucros')).toContainText('R$ 1.000,00');
   await other.close();

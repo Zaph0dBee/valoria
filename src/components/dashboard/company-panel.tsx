@@ -51,12 +51,19 @@ export function CompanyPanel({
 
   async function register(value: number, occurredOn: string, suggested: boolean) {
     setLoading(true);
-    const res = await registerProfitDistribution({
-      profile_id: profileId,
-      amount: value,
-      occurred_on: occurredOn,
-      suggested,
-    }).finally(() => setLoading(false));
+    let res: Awaited<ReturnType<typeof registerProfitDistribution>>;
+    try {
+      res = await registerProfitDistribution({ profile_id: profileId, amount: value, occurred_on: occurredOn, suggested });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível registrar o lucro. Verifique a conexão e tente de novo.',
+      });
+      return;
+    } finally {
+      setLoading(false);
+    }
     if ('error' in res) {
       toast({ variant: 'destructive', title: 'Erro', description: res.error });
       return;

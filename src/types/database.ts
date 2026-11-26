@@ -546,6 +546,16 @@ export type Database = {
           lucros_distribuidos: number;
         }[];
       };
+      register_profit_distribution: {
+        Args: {
+          target_profile: string;
+          profit_amount: number;
+          profit_date: string;
+          profit_description: string;
+          only_available?: boolean;
+        };
+        Returns: string;
+      };
       get_monthly_summaries: {
         Args: { start_month: string; months: number };
         Returns: (Database['public']['Functions']['get_monthly_financial_summary']['Returns'][number] & {
